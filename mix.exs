@@ -1,9 +1,9 @@
-defmodule JetExp.MixProject do
+defmodule Moai.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :jet_exp,
+      app: :moai,
       version: "0.1.0",
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
