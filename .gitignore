@@ -26,3 +26,4 @@ jet_exp-*.tar
 /tmp/
 
 /src/*_tokenizer.erl
+/src/*_parser.erl
