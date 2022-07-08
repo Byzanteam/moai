@@ -24,3 +24,5 @@ jet_exp-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+/src/*_tokenizer.erl
