@@ -81,6 +81,11 @@ defmodule JetExp.Parser.Ast do
     is_binary(node)
   end
 
+  @spec literal?(t()) :: boolean()
+  def literal?(node) do
+    nil?(node) or bool?(node) or number?(node) or string?(node)
+  end
+
   @spec list?(t()) :: boolean()
   def list?(node) do
     match?({:"[]", args} when is_list(args), node) or
@@ -333,7 +338,7 @@ defmodule JetExp.Parser.Ast do
   end
 
   defp atomic?(node) do
-    id?(node) or nil?(node) or bool?(node) or number?(node) or string?(node)
+    id?(node) or literal?(node)
   end
 
   @spec walk_node_with_args(
