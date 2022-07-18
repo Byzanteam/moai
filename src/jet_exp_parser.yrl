@@ -31,7 +31,7 @@ expr -> list_comp : '$1'.
 expr -> call : '$1'.
 expr -> operation : '$1'.
 
-literal -> nil : build_nil('$1').
+literal -> nil : build_nil().
 literal -> bool : build_literal('$1').
 literal -> number : build_literal('$1').
 literal -> string : build_literal('$1').
@@ -42,10 +42,10 @@ group -> '(' expr ')' : '$2'.
 comma_sep_list -> expr : ['$1'].
 comma_sep_list -> comma_sep_list ',' expr : ['$3' | '$1'].
 
-list -> '[' ']' : [].
-list -> '[' comma_sep_list ']' : lists:reverse('$2').
+list -> '[' ']' : {'[]', []}.
+list -> '[' comma_sep_list ']' : {'[]', lists:reverse('$2')}.
 
-list_comp -> 'for' id 'in' expr '->' expr : build_list_comp('$4', '$6', build_id('$2')).
+list_comp -> 'for' id 'in' expr '->' expr : build_list_comp(build_id('$2'), '$4', '$6').
 
 call -> id call_args_parens : {build_id('$1'), '$2'}.
 call_args_parens -> '(' ')' : [].
@@ -85,20 +85,20 @@ dot_op -> '.' : '$1'.
 
 Erlang code.
 
-build_id({id, _TokenLine, Value}) -> Value.
+build_id({id, _TokenLine, Name}) -> {id, Name}.
 
-build_nil({nil, _TokenLine}) -> nil.
+build_nil() -> nil.
 
-build_literal({Category, _TokenLine, Value}) -> {Category, Value}.
+build_literal({_Category, _TokenLine, Value}) -> Value.
 
 build_sigil({sigil, _TokenLine, Sigil}, Value) -> {sigil, {Sigil, Value}}.
 
 build_op({Op, _TokenLine}) -> Op.
 
-build_unary_op_expr('+', Value) -> Value;
-build_unary_op_expr('-', {number, Number}) -> {number, -Number};
-build_unary_op_expr('-', Value) -> {'-', [Value]};
-build_unary_op_expr(Op, Value) ->
-  {Op, [Value]}.
+build_unary_op_expr('+', Term) -> Term;
+build_unary_op_expr('-', Number) when is_number(Number) -> -Number;
+build_unary_op_expr('-', Id) -> {'-', [Id]};
+build_unary_op_expr('not', Bool) when is_boolean(Bool) -> not Bool;
+build_unary_op_expr('not', Id) -> {'not', [Id]}.
 
-build_list_comp(List, Mapper, Bind) -> {map, [List, Mapper, Bind]}.
+build_list_comp(Bind, SourceExpr, TargetExpr) -> {for, [{in, [Bind, SourceExpr]}, TargetExpr]}.
