@@ -45,6 +45,50 @@ defmodule JetExp.Core.InterpreterTest do
     end
   end
 
+  describe "call" do
+    alias JetExp.Core.Interpreter.Env
+
+    test "works" do
+      assert {:ok, 2.0} ===
+               eval("avg(1, x)", %{
+                 "x" => 3,
+                 "avg" => Env.Function.new(__MODULE__, :avg)
+               })
+
+      assert {:ok, 2} ===
+               eval("avg(1, x)", %{
+                 "x" => 3,
+                 "avg" => Env.Function.new(__MODULE__, :avg, [:trunc])
+               })
+
+      assert {:ok, nil} ===
+               eval("avg(1, x)", %{
+                 "x" => nil,
+                 "avg" => Env.Function.new(__MODULE__, :avg, [:trunc])
+               })
+
+      assert {:ok, 0.5} ===
+               eval("avg(1, x)", %{
+                 "x" => nil,
+                 "avg" => Env.Function.new(__MODULE__, :avg, [], require_args: false)
+               })
+    end
+
+    def avg(a, b)
+        when is_nil(a)
+        when is_nil(b) do
+      avg(a || 0, b || 0)
+    end
+
+    def avg(a, b) do
+      {:ok, (a + b) / 2}
+    end
+
+    def avg(a, b, :trunc) do
+      {:ok, trunc((a + b) / 2)}
+    end
+  end
+
   describe "arith" do
     test "works" do
       assert {:ok, 5} === eval("x + y", %{"x" => 2, "y" => 3})

@@ -1,10 +1,56 @@
 defmodule JetExp.Core.Interpreter.Env do
   @moduledoc false
 
+  defmodule Function do
+    @moduledoc false
+
+    @type opts() :: [require_args: boolean()]
+
+    @type t() :: %__MODULE__{
+            module: module(),
+            fun: atom(),
+            extra_args: [term()],
+            opts: opts()
+          }
+
+    @enforce_keys [:module, :fun]
+    defstruct [
+      :module,
+      :fun,
+      extra_args: [],
+      opts: []
+    ]
+
+    @default_opts [require_args: true]
+
+    @spec new(module(), fun :: atom(), extra_args :: [term()], opts()) :: t()
+    def new(module, fun, extra_args \\ [], opts \\ @default_opts) do
+      %__MODULE__{
+        module: module,
+        fun: fun,
+        extra_args: extra_args,
+        opts: opts
+      }
+    end
+
+    @spec apply(t(), args :: [term()]) :: {:ok, term()} | :error
+    def apply(%__MODULE__{extra_args: []} = fun, args) do
+      Kernel.apply(fun.module, fun.fun, args)
+    end
+
+    def apply(%__MODULE__{} = fun, args) do
+      Kernel.apply(fun.module, fun.fun, args ++ fun.extra_args)
+    end
+
+    @spec require_args?(t()) :: boolean()
+    def require_args?(%__MODULE__{} = fun) do
+      Keyword.get(fun.opts, :require_args, true)
+    end
+  end
+
   @type name() :: String.t()
 
-  @type value() :: nil | boolean() | number() | String.t() | fun_v()
-  @type fun_v() :: {module(), function :: atom(), extra_args :: [term()]}
+  @type value() :: nil | boolean() | number() | String.t() | Function.t()
 
   @typep bindings() :: %{required(name()) => value()}
 

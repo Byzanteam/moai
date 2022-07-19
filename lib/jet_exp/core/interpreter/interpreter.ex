@@ -16,6 +16,9 @@ defmodule JetExp.Core.Interpreter do
       Ast.list?(node) ->
         eval_list(node, env)
 
+      Ast.call?(node) ->
+        apply_fun(node, env)
+
       Ast.arith_op?(node) ->
         eval_arith(node, env)
 
@@ -26,6 +29,30 @@ defmodule JetExp.Core.Interpreter do
 
   defp eval_list(node, env) do
     node |> Ast.list_args() |> eval_args(env)
+  end
+
+  defp apply_fun(node, env) do
+    with({:ok, fun} <- Env.lookup(env, node |> Ast.call_id() |> Ast.id_name())) do
+      do_apply_fun(fun, Ast.call_args(node), env)
+    end
+  end
+
+  defp do_apply_fun(fun, [], _env) do
+    Env.Function.apply(fun, [])
+  end
+
+  defp do_apply_fun(fun, args, env) do
+    with({:ok, [_ | _] = args} <- eval_fun_args(fun, args, env)) do
+      Env.Function.apply(fun, args)
+    end
+  end
+
+  defp eval_fun_args(fun, args, env) do
+    if Env.Function.require_args?(fun) do
+      eval_required_args(args, env)
+    else
+      eval_args(args, env)
+    end
   end
 
   defp eval_arith(node, env) do
@@ -99,11 +126,12 @@ defmodule JetExp.Core.Interpreter do
   end
 
   defp do_eval_logic(:not, [operand], env) do
-    with({:ok, value} <- eval(operand, env)) do
+    with({:ok, value} when not is_nil(value) <- eval(operand, env)) do
       {:ok, not value}
     end
   end
 
+  @spec eval_args([Ast.t()], Env.t()) :: {:ok, [Ast.t()]} | :error
   defp eval_args(nodes, env) do
     with(value when is_list(value) <- do_eval_args(nodes, env)) do
       {:ok, Enum.reverse(value)}
@@ -122,6 +150,7 @@ defmodule JetExp.Core.Interpreter do
     end)
   end
 
+  @spec eval_required_args([Ast.t()], Env.t()) :: {:ok, [Ast.t()]} | {:ok, nil} | :error
   defp eval_required_args(nodes, env) do
     case eval_list_while(nodes, &(not is_nil(&1)), env) do
       {:ok, args} ->
