@@ -28,6 +28,12 @@ defmodule JetExp.Core.Interpreter do
       Ast.logic_op?(node) ->
         eval_logic(node, env)
 
+      Ast.rel_op?(node) ->
+        eval_rel(node, env)
+
+      Ast.comp_op?(node) ->
+        eval_comp(node, env)
+
       Ast.list_comp?(node) ->
         eval_list_comp(node, env)
     end
@@ -85,17 +91,11 @@ defmodule JetExp.Core.Interpreter do
   end
 
   defp eval_arith(node, env) do
-    do_eval_arith(
-      Ast.op_operator(node),
-      Ast.op_operands(node),
-      env
-    )
+    dispatch_op(node, env, &do_eval_arith/3)
   end
 
   defp do_eval_arith(:+, operands, env) do
-    with({:ok, [left, right]} <- eval_required_args(operands, env)) do
-      {:ok, left + right}
-    end
+    eval_binary_op(operands, env, &(&1 + &2))
   end
 
   defp do_eval_arith(:-, operands, env) do
@@ -112,9 +112,7 @@ defmodule JetExp.Core.Interpreter do
   end
 
   defp do_eval_arith(:*, operands, env) do
-    with({:ok, [left, right]} <- eval_required_args(operands, env)) do
-      {:ok, left * right}
-    end
+    eval_binary_op(operands, env, &(&1 * &2))
   end
 
   defp do_eval_arith(:/, operands, env) do
@@ -131,11 +129,7 @@ defmodule JetExp.Core.Interpreter do
   end
 
   defp eval_logic(node, env) do
-    do_eval_logic(
-      Ast.op_operator(node),
-      Ast.op_operands(node),
-      env
-    )
+    dispatch_op(node, env, &do_eval_logic/3)
   end
 
   defp do_eval_logic(:and, operands, env) do
@@ -157,6 +151,50 @@ defmodule JetExp.Core.Interpreter do
   defp do_eval_logic(:not, [operand], env) do
     with({:ok, value} when not is_nil(value) <- eval(operand, env)) do
       {:ok, not value}
+    end
+  end
+
+  defp eval_rel(node, env) do
+    rel_fun =
+      case Ast.op_operator(node) do
+        :> -> &(&1 > &2)
+        :< -> &(&1 < &2)
+        :>= -> &(&1 >= &2)
+        :<= -> &(&1 <= &2)
+      end
+
+    eval_binary_op(
+      Ast.op_operands(node),
+      env,
+      rel_fun
+    )
+  end
+
+  defp eval_comp(node, env) do
+    comp_fun =
+      case Ast.op_operator(node) do
+        :== -> &(&1 === &2)
+        :!= -> &(&1 !== &2)
+      end
+
+    eval_binary_op(
+      Ast.op_operands(node),
+      env,
+      comp_fun
+    )
+  end
+
+  defp dispatch_op(node, env, fun) do
+    fun.(
+      Ast.op_operator(node),
+      Ast.op_operands(node),
+      env
+    )
+  end
+
+  defp eval_binary_op(operands, env, fun) do
+    with({:ok, [left, right]} <- eval_required_args(operands, env)) do
+      {:ok, fun.(left, right)}
     end
   end
 

@@ -242,6 +242,49 @@ defmodule JetExp.Typing.AnnotatorTest do
     end
   end
 
+  describe "relation operation" do
+    test "works" do
+      symbol_table = build_symbol_table(%{"x" => %{type: :number}, "y" => %{type: :number}})
+
+      assert {:ok, :bool} === extract_type("x > y", symbol_table)
+      assert {:ok, :bool} === extract_type("x >= y", symbol_table)
+      assert {:ok, :bool} === extract_type("x < y", symbol_table)
+      assert {:ok, :bool} === extract_type("x <= y", symbol_table)
+    end
+
+    test "fails on type slaps" do
+      symbol_table = build_symbol_table(%{"x" => %{type: :number}, "y" => %{type: :string}})
+
+      assert {:error, reason: :type_slaps, expected_type: :number} ===
+               extract_type("x > y", symbol_table)
+
+      assert {:error, reason: :type_slaps, expected_type: :number} ===
+               extract_type("x < y", symbol_table)
+
+      assert {:error, reason: :type_slaps, expected_type: :number} ===
+               extract_type("x >= y", symbol_table)
+
+      assert {:error, reason: :type_slaps, expected_type: :number} ===
+               extract_type("x <= y", symbol_table)
+    end
+  end
+
+  describe "comparison operation" do
+    test "works" do
+      symbol_table = build_symbol_table(%{"x" => %{type: :string}, "y" => %{type: :string}})
+
+      assert {:ok, :bool} === extract_type("x == y", symbol_table)
+      assert {:ok, :bool} === extract_type("x != y", symbol_table)
+    end
+
+    test "fails on type slaps" do
+      symbol_table = build_symbol_table(%{"x" => %{type: :string}, "y" => %{type: :number}})
+
+      assert {:error, reason: :type_slaps, expected_type: :string} ===
+               extract_type("x == y", symbol_table)
+    end
+  end
+
   defp extract_type(code, symbol_table \\ JetExp.SymbolTable.new(%{})) do
     {:ok, tokens} = JetExp.Tokenizer.tokenize(code)
     {:ok, ast} = JetExp.Parser.parse(tokens)

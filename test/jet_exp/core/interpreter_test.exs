@@ -142,6 +142,38 @@ defmodule JetExp.Core.InterpreterTest do
     end
   end
 
+  describe "relation" do
+    test "works" do
+      env = %{"x" => 1, "y" => 2}
+
+      assert {:ok, false} === eval("x > y", env)
+      assert {:ok, false} === eval("x >= y", env)
+      assert {:ok, true} === eval("x < y", env)
+      assert {:ok, true} === eval("x <= y", env)
+
+      env = %{"x" => 2, "y" => 2}
+
+      assert {:ok, false} === eval("x > y", env)
+      assert {:ok, true} === eval("x >= y", env)
+      assert {:ok, false} === eval("x < y", env)
+      assert {:ok, true} === eval("x <= y", env)
+    end
+  end
+
+  describe "comparison" do
+    test "works" do
+      assert {:ok, true} === eval("x == y", %{"x" => 1, "y" => 1})
+      assert {:ok, false} === eval("x != y", %{"x" => 1, "y" => 1})
+      assert {:ok, false} === eval("x == y", %{"x" => 1, "y" => 2})
+      assert {:ok, true} === eval("x != y", %{"x" => 1, "y" => 2})
+
+      assert {:ok, true} === eval("x == y", %{"x" => "foo", "y" => "foo"})
+      assert {:ok, false} === eval("x != y", %{"x" => "foo", "y" => "foo"})
+      assert {:ok, false} === eval("x == y", %{"x" => "foo", "y" => "bar"})
+      assert {:ok, true} === eval("x != y", %{"x" => "foo", "y" => "bar"})
+    end
+  end
+
   describe "list_comp" do
     test "works" do
       assert {:ok, [2, 3, 4]} ===

@@ -33,7 +33,7 @@ defmodule JetExp.Parser.Ast do
 
   @type call_node() :: {id_node(), args :: [t()]} | {id_node(), annotations(), args :: [t()]}
 
-  @typep operator() :: :+ | :- | :* | :/ | :and | :or | :not
+  @typep operator() :: :+ | :- | :* | :/ | :and | :or | :not | :== | :!= | :< | :> | :<= | :>=
   @type op_node() ::
           {operator(), operands :: [t(), ...]}
           | {operator(), annotations(), operands :: [t(), ...]}
@@ -264,32 +264,28 @@ defmodule JetExp.Parser.Ast do
     {call_id, annotations, args}
   end
 
-  @spec arith_op?(t()) :: boolean()
-  def arith_op?(node) do
-    match?(
-      {op, operands}
-      when op in [:+, :-, :*, :/] and (1 === length(operands) or 2 === length(operands)),
-      node
-    ) or
+  @ops %{
+    arith: [:+, :-, :*, :/],
+    logic: [:and, :or, :not],
+    comp: [:==, :!=],
+    rel: [:<, :>, :<=, :>=]
+  }
+
+  for {category, ops} <- @ops do
+    fun = :"#{category}_op?"
+
+    @spec unquote(fun)(t()) :: boolean()
+    def unquote(fun)(node) do
       match?(
-        {op, _annotations, operands}
-        when op in [:+, :-, :*, :/] and (1 === length(operands) or 2 === length(operands)),
+        {op, _operands} when op in unquote(ops),
         node
       )
+    end
   end
 
-  @spec logic_op?(t()) :: boolean()
-  def logic_op?(node) do
-    match?(
-      {op, operands}
-      when op in [:and, :or, :not] and (1 === length(operands) or 2 === length(operands)),
-      node
-    ) or
-      match?(
-        {op, _annotations, operands}
-        when op in [:and, :or, :not] and (1 === length(operands) or 2 === length(operands)),
-        node
-      )
+  @spec op?(t()) :: boolean()
+  def op?(node) do
+    arith_op?(node) or logic_op?(node) or comp_op?(node) or rel_op?(node)
   end
 
   @spec op_operator(op_node()) :: operator()
@@ -332,7 +328,7 @@ defmodule JetExp.Parser.Ast do
       call?(node) ->
         walk_node_with_args(node, &call_args/1, &make_call(call_id(node), &1), acc, fun)
 
-      arith_op?(node) or logic_op?(node) ->
+      op?(node) ->
         walk_node_with_args(node, &op_operands/1, &make_op(op_operator(node), &1), acc, fun)
     end
   end
@@ -388,7 +384,7 @@ defmodule JetExp.Parser.Ast do
         args = call_args(node)
         make_call(call_id, args, annotations)
 
-      arith_op?(node) or logic_op?(node) ->
+      op?(node) ->
         op = op_operator(node)
         operands = op_operands(node)
         make_op(op, operands, annotations)

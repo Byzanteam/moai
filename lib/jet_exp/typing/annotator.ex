@@ -65,10 +65,16 @@ defmodule JetExp.Typing.Annotator do
         infer_call(node, symbol_table)
 
       Ast.arith_op?(node) ->
-        infer_op(node, :number)
+        infer_op(node, :number, :number)
 
       Ast.logic_op?(node) ->
-        infer_op(node, :bool)
+        infer_op(node, :bool, :bool)
+
+      Ast.rel_op?(node) ->
+        infer_op(node, :number, :bool)
+
+      Ast.comp_op?(node) ->
+        infer_comp_op(node)
     end
   end
 
@@ -202,10 +208,21 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
-  defp infer_op(node, type) do
+  defp infer_op(node, expected_type, final_type) do
     node
     |> Ast.op_operands()
-    |> check_homogeneous(type, type)
+    |> check_homogeneous(expected_type, final_type)
+  end
+
+  defp infer_comp_op(node) do
+    [left, right] = Ast.op_operands(node)
+
+    with(
+      {:ok, type} <- extract_type(left),
+      :ok <- has_type?(right, type)
+    ) do
+      {:ok, :bool}
+    end
   end
 
   defp has_type?(node, type) do
