@@ -110,7 +110,7 @@ defmodule JetExp.Core.InterpreterTest do
     end
 
     test "fails when dividing by 0" do
-      assert :error === eval("x / y", %{"x" => 1, "y" => 0})
+      assert {:ok, nil} === eval("x / y", %{"x" => 1, "y" => 0})
     end
   end
 
@@ -139,6 +139,24 @@ defmodule JetExp.Core.InterpreterTest do
       assert {:ok, false} === eval("not x", %{"x" => true})
       assert {:ok, true} === eval("not x", %{"x" => false})
       assert {:ok, nil} === eval("not x", %{"x" => nil})
+    end
+  end
+
+  describe "list_comp" do
+    test "works" do
+      assert {:ok, [2, 3, 4]} ===
+               eval("for x in xs -> x + 1", %{
+                 "xs" => [1, 2, 3]
+               })
+
+      assert {:ok, []} === eval("for x in xs -> x + 1", %{"xs" => []})
+
+      assert {:ok, [nil, 2.0, 1.0]} ===
+               eval("for x in xs -> 2 / x", %{
+                 "xs" => [0, 1, 2]
+               })
+
+      assert {:ok, nil} === eval("for x in xs -> x + 1", %{"xs" => nil})
     end
   end
 

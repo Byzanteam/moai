@@ -50,7 +50,7 @@ defmodule JetExp.Core.Interpreter.Env do
 
   @type name() :: String.t()
 
-  @type value() :: nil | boolean() | number() | String.t() | Function.t()
+  @type value() :: nil | boolean() | number() | String.t() | Function.t() | [value()]
 
   @typep bindings() :: %{required(name()) => value()}
 

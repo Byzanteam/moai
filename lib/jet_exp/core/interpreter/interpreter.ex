@@ -27,6 +27,9 @@ defmodule JetExp.Core.Interpreter do
 
       Ast.logic_op?(node) ->
         eval_logic(node, env)
+
+      Ast.list_comp?(node) ->
+        eval_list_comp(node, env)
     end
   end
 
@@ -117,7 +120,7 @@ defmodule JetExp.Core.Interpreter do
   defp do_eval_arith(:/, operands, env) do
     case eval_required_args(operands, env) do
       {:ok, [_left, 0]} ->
-        :error
+        {:ok, nil}
 
       {:ok, [left, right]} ->
         {:ok, left / right}
@@ -155,6 +158,34 @@ defmodule JetExp.Core.Interpreter do
     with({:ok, value} when not is_nil(value) <- eval(operand, env)) do
       {:ok, not value}
     end
+  end
+
+  defp eval_list_comp(node, env) do
+    [var, source] = node |> Ast.list_comp_binding() |> Ast.list_comp_binding_args()
+
+    with(
+      {:ok, [_ | _] = source_value} <- eval(source, env),
+      target = Ast.list_comp_target(node),
+      [_ | _] = target_value <- do_eval_list_comp(source_value, target, var, env)
+    ) do
+      {:ok, Enum.reverse(target_value)}
+    end
+  end
+
+  defp do_eval_list_comp(source_value, target, var, env) do
+    var_name = Ast.id_name(var)
+
+    Enum.reduce_while(source_value, [], fn v, acc ->
+      env = Env.new(%{var_name => v}, env)
+
+      case eval(target, env) do
+        {:ok, value} ->
+          {:cont, [value | acc]}
+
+        :error ->
+          {:halt, :error}
+      end
+    end)
   end
 
   @spec eval_args([Ast.t()], Env.t()) :: {:ok, [Ast.t()]} | :error
