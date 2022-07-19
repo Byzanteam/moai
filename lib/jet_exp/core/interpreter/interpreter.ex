@@ -16,6 +16,9 @@ defmodule JetExp.Core.Interpreter do
       Ast.list?(node) ->
         eval_list(node, env)
 
+      Ast.conditional?(node) ->
+        eval_conditional(node, env)
+
       Ast.call?(node) ->
         apply_fun(node, env)
 
@@ -29,6 +32,29 @@ defmodule JetExp.Core.Interpreter do
 
   defp eval_list(node, env) do
     node |> Ast.list_args() |> eval_args(env)
+  end
+
+  defp eval_conditional(node, env) do
+    case node |> Ast.conditional_predicate() |> eval(env) do
+      {:ok, true} ->
+        node |> Ast.conditional_consequent() |> eval(env)
+
+      {:ok, false} ->
+        eval_conditional_alternative(node, env)
+
+      nil_or_error ->
+        nil_or_error
+    end
+  end
+
+  defp eval_conditional_alternative(node, env) do
+    case Ast.conditional_alternative(node) do
+      {:ok, alternative} ->
+        eval(alternative, env)
+
+      :error ->
+        {:ok, nil}
+    end
   end
 
   defp apply_fun(node, env) do

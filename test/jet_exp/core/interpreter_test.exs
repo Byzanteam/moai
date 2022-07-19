@@ -45,6 +45,17 @@ defmodule JetExp.Core.InterpreterTest do
     end
   end
 
+  describe "conditional" do
+    test "works" do
+      assert {:ok, 1} === eval("if(x, a, b)", %{"x" => true, "a" => 1, "b" => 2})
+      assert {:ok, 2} === eval("if(x, a, b)", %{"x" => false, "a" => 1, "b" => 2})
+
+      assert {:ok, nil} === eval("if(x, a)", %{"x" => nil, "a" => 1})
+      assert {:ok, nil} === eval("if(x, a)", %{"x" => false, "a" => 1})
+      assert {:ok, nil} === eval("if(x, a)", %{"x" => true, "a" => nil})
+    end
+  end
+
   describe "call" do
     alias JetExp.Core.Interpreter.Env
 
