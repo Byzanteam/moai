@@ -3,36 +3,35 @@ defmodule JetExp.Typing.Annotator do
 
   alias JetExp.Parser.Ast
 
-  alias JetExp.SymbolTable
-  alias JetExp.SymbolTable.SymbolInfo
+  alias JetExp.Parser.Context
+  alias JetExp.Parser.Context.SymbolInfo
 
   alias JetExp.Typing.Types
 
   @type errors() :: Keyword.t()
 
-  @spec annotate(Ast.t(), SymbolTable.t()) :: Ast.t()
-  def annotate(node, symbol_table) do
-    {aast, _acc} =
-      Ast.postwalk(node, symbol_table, fn n, acc ->
-        case infer(n, acc) do
-          {:ok, type} ->
-            {Ast.annotate(n, type: type), acc}
+  @doc """
+  `annotator/2` is a postwalker that infer types and collect
+  type errors.
+  """
+  @spec annotator(Ast.t(), Context.t()) :: {Ast.t(), Context.t()}
+  def annotator(node, context) do
+    case infer(node, context) do
+      {:ok, type} ->
+        {Ast.annotate(node, type: type), context}
 
-          {:ok, type, acc} ->
-            {Ast.annotate(n, type: type), acc}
+      {:ok, type, context} ->
+        {Ast.annotate(node, type: type), context}
 
-          {:error, errors} ->
-            {Ast.annotate(n, errors: errors), acc}
+      {:error, errors} ->
+        {Ast.annotate(node, errors: errors), context}
 
-          :skip ->
-            {n, acc}
-        end
-      end)
-
-    aast
+      :skip ->
+        {node, context}
+    end
   end
 
-  defp infer(node, symbol_table) do
+  defp infer(node, context) do
     cond do
       Ast.nil?(node) ->
         :skip
@@ -47,22 +46,22 @@ defmodule JetExp.Typing.Annotator do
         :skip
 
       Ast.id?(node) ->
-        infer_id(node, symbol_table)
+        infer_id(node, context)
 
       Ast.list?(node) ->
         infer_list(node)
 
       Ast.list_comp_binding?(node) ->
-        perform_list_comp_binding(node, symbol_table)
+        perform_list_comp_binding(node, context)
 
       Ast.list_comp?(node) ->
-        infer_list_comp(node, symbol_table)
+        infer_list_comp(node, context)
 
       Ast.conditional?(node) ->
         infer_conditional(node)
 
       Ast.call?(node) ->
-        infer_call(node, symbol_table)
+        infer_call(node, context)
 
       Ast.arith_op?(node) ->
         infer_op(node, :number, :number)
@@ -81,10 +80,10 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
-  defp infer_id(node, symbol_table) do
+  defp infer_id(node, context) do
     name = Ast.id_name(node)
 
-    case SymbolTable.lookup(symbol_table, name) do
+    case Context.lookup_symbol(context, name) do
       {:ok, info} ->
         {:ok, SymbolInfo.extract(info, :type)}
 
@@ -109,15 +108,14 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
-  defp perform_list_comp_binding(node, symbol_table) do
+  defp perform_list_comp_binding(node, context) do
     [var, source_expr] = Ast.list_comp_binding_args(node)
 
     case extract_type(source_expr) do
       {:ok, [type]} ->
-        symbol_table =
-          SymbolTable.new(%{Ast.id_name(var) => SymbolInfo.new(%{type: type})}, symbol_table)
+        context = Context.new(%{Ast.id_name(var) => SymbolInfo.new(%{type: type})}, context)
 
-        {:ok, type, symbol_table}
+        {:ok, type, context}
 
       {:ok, _type} ->
         type_slaps(:"[a]")
@@ -127,14 +125,14 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
-  defp infer_list_comp(node, symbol_table) do
-    symbol_table = symbol_table.surrounding
+  defp infer_list_comp(node, context) do
+    context = context.enclosing
 
     with(
       {:ok, _type} <- node |> Ast.list_comp_binding() |> extract_type(),
       {:ok, type} <- node |> Ast.list_comp_target() |> extract_type()
     ) do
-      {:ok, [type], symbol_table}
+      {:ok, [type], context}
     end
   end
 
@@ -167,8 +165,8 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
-  defp infer_call(node, symbol_table) do
-    case node |> Ast.call_id() |> infer_id(symbol_table) do
+  defp infer_call(node, context) do
+    case node |> Ast.call_id() |> infer_id(context) do
       {:ok, {:fun, _type} = fun_type} ->
         do_infer_call(fun_type, Ast.call_args(node))
 

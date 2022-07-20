@@ -7,6 +7,7 @@ defmodule JetExp.Parser.Ast do
           | bool_node()
           | number_node()
           | string_node()
+          | sigil_node()
           | list_node()
           | list_comp_node_binding()
           | list_comp_node()
@@ -21,6 +22,8 @@ defmodule JetExp.Parser.Ast do
   @type bool_node() :: boolean()
   @type number_node() :: number()
   @type string_node() :: String.t()
+
+  @type sigil_node() :: {:sigil, args :: [t()]} | {:sigil, annotations(), args :: [t]}
 
   @type list_node() :: {:"[]", args :: [t()]} | {:"[]", annotations(), args :: [t()]}
 
@@ -85,6 +88,25 @@ defmodule JetExp.Parser.Ast do
   @spec literal?(t()) :: boolean()
   def literal?(node) do
     nil?(node) or bool?(node) or number?(node) or string?(node)
+  end
+
+  @spec sigil?(t()) :: boolean()
+  def sigil?(node) do
+    match?({:sigil, [_ | _]}, node) or match?({:sigil, _annotations, [_ | _]}, node)
+  end
+
+  @spec sigil_args(sigil_node()) :: [t()]
+  def sigil_args({:sigil, args}) do
+    args
+  end
+
+  def sigil_args({:sigil, _annotations, args}) do
+    args
+  end
+
+  @spec make_sigil(args :: [t()]) :: sigil_node()
+  def make_sigil(args) do
+    {:sigil, args}
   end
 
   @spec list?(t()) :: boolean()
@@ -310,51 +332,71 @@ defmodule JetExp.Parser.Ast do
     {operator, annotations, operands}
   end
 
-  @spec postwalk(t(), acc, (t(), acc -> {t(), acc})) :: {t, acc} when acc: var
-  def postwalk(node, acc, fun) do
-    cond do
-      atomic?(node) ->
-        fun.(node, acc)
-
-      list?(node) ->
-        walk_node_with_args(node, &list_args/1, &make_list/1, acc, fun)
-
-      list_comp_binding?(node) ->
-        [var, source_expr] = list_comp_binding_args(node)
-        {source_expr, acc} = postwalk(source_expr, acc, fun)
-        fun.(make_list_comp_binding([var, source_expr]), acc)
-
-      list_comp?(node) ->
-        walk_node_with_args(node, &list_comp_args/1, &make_list_comp/1, acc, fun)
-
-      call?(node) ->
-        walk_node_with_args(node, &call_args/1, &make_call(call_id(node), &1), acc, fun)
-
-      access_op?(node) ->
-        [source_expr, accessor] = op_operands(node)
-        {source_expr, acc} = postwalk(source_expr, acc, fun)
-        fun.(make_op(op_operator(node), [source_expr, accessor]), acc)
-
-      op?(node) ->
-        walk_node_with_args(node, &op_operands/1, &make_op(op_operator(node), &1), acc, fun)
-    end
-  end
-
   defp atomic?(node) do
     id?(node) or literal?(node)
   end
 
-  @spec walk_node_with_args(
-          t(),
-          args_extractor :: (t() -> args :: [t()]),
-          builder :: (args :: [t()] -> t()),
-          acc :: acc,
-          fun :: (t(), acc -> {t(), acc})
-        ) :: {t(), acc}
-        when acc: var
-  defp walk_node_with_args(node, args_extractor, builder, acc, fun) do
-    {args, acc} = node |> args_extractor.() |> Enum.map_reduce(acc, &postwalk(&1, &2, fun))
-    fun.(builder.(args), acc)
+  @spec traverse(t(), acc, pre :: fun, post :: fun) :: {t(), acc}
+        when fun: (t(), acc -> {t(), acc}), acc: var
+  def traverse(node, acc, pre, post) do
+    {node, acc} = pre.(node, acc)
+    do_traverse(node, acc, pre, post)
+  end
+
+  defp do_traverse(node, acc, pre, post) do
+    cond do
+      atomic?(node) ->
+        post.(node, acc)
+
+      list?(node) ->
+        {list_args, acc} = node |> list_args() |> do_traverse_args(acc, pre, post)
+        post.(make_list(list_args), acc)
+
+      sigil?(node) ->
+        {args, acc} = node |> sigil_args() |> do_traverse_args(acc, pre, post)
+        post.(make_sigil(args), acc)
+
+      list_comp_binding?(node) ->
+        [var, source_expr] = list_comp_binding_args(node)
+        {source_expr, acc} = pre.(source_expr, acc)
+        {source_expr, acc} = do_traverse(source_expr, acc, pre, post)
+        post.(make_list_comp_binding([var, source_expr]), acc)
+
+      list_comp?(node) ->
+        {args, acc} = node |> list_comp_args() |> do_traverse_args(acc, pre, post)
+        post.(make_list_comp(args), acc)
+
+      call?(node) ->
+        {args, acc} = node |> call_args() |> do_traverse_args(acc, pre, post)
+        post.(make_call(call_id(node), args), acc)
+
+      access_op?(node) ->
+        [source_expr, accessor] = op_operands(node)
+        {source_expr, acc} = pre.(source_expr, acc)
+        {source_expr, acc} = do_traverse(source_expr, acc, pre, post)
+        post.(make_op(op_operator(node), [source_expr, accessor]), acc)
+
+      op?(node) ->
+        {operands, acc} = node |> op_operands() |> do_traverse_args(acc, pre, post)
+        post.(make_op(op_operator(node), operands), acc)
+    end
+  end
+
+  defp do_traverse_args(args, acc, pre, post) do
+    Enum.map_reduce(args, acc, fn n, acc ->
+      {n, acc} = pre.(n, acc)
+      do_traverse(n, acc, pre, post)
+    end)
+  end
+
+  @spec postwalk(t(), acc, (t(), acc -> {t(), acc})) :: {t, acc} when acc: var
+  def postwalk(node, acc, fun) do
+    traverse(node, acc, fn x, a -> {x, a} end, fun)
+  end
+
+  @spec prewalk(t(), acc, (t(), acc -> {t(), acc})) :: {t, acc} when acc: var
+  def prewalk(node, acc, fun) do
+    traverse(node, acc, fun, fn x, a -> {x, a} end)
   end
 
   @spec annotate(

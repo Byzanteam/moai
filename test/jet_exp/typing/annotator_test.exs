@@ -331,18 +331,21 @@ defmodule JetExp.Typing.AnnotatorTest do
     end
   end
 
-  defp extract_type(code, symbol_table \\ JetExp.SymbolTable.new(%{})) do
+  defp extract_type(code, symbol_table \\ JetExp.Parser.Context.new(%{})) do
     {:ok, tokens} = JetExp.Tokenizer.tokenize(code)
     {:ok, ast} = JetExp.Parser.parse(tokens)
-    aast = JetExp.Typing.Annotator.annotate(ast, symbol_table)
+
+    {aast, _acc} =
+      JetExp.Parser.Ast.postwalk(ast, symbol_table, &JetExp.Typing.Annotator.annotator/2)
+
     JetExp.Typing.Annotator.extract_type(aast)
   end
 
   defp build_symbol_table(symbols) do
     symbols
     |> Map.new(fn {name, info} ->
-      {name, JetExp.SymbolTable.SymbolInfo.new(info)}
+      {name, JetExp.Parser.Context.SymbolInfo.new(info)}
     end)
-    |> JetExp.SymbolTable.new()
+    |> JetExp.Parser.Context.new()
   end
 end

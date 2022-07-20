@@ -1,4 +1,4 @@
-defmodule JetExp.SymbolTable do
+defmodule JetExp.Parser.Context do
   @moduledoc false
 
   defmodule SymbolInfo do
@@ -26,33 +26,29 @@ defmodule JetExp.SymbolTable do
 
   @typep symbols() :: %{required(name()) => SymbolInfo.t()}
 
-  @type t() :: %__MODULE__{symbols: symbols(), surrounding: t() | nil}
+  @type t() :: %__MODULE__{symbols: symbols(), enclosing: t() | nil}
 
   @enforce_keys [:symbols]
-  defstruct [:symbols, :surrounding]
+  defstruct [:symbols, :enclosing]
 
   @spec new(symbols()) :: t()
   def new(symbols) do
     %__MODULE__{symbols: symbols}
   end
 
-  @spec new(symbols(), surrounding :: t()) :: t()
-  def new(symbols, surrounding) do
-    %__MODULE__{symbols: symbols, surrounding: surrounding}
+  @spec new(symbols(), enclosing :: t()) :: t()
+  def new(symbols, enclosing) do
+    %__MODULE__{symbols: symbols, enclosing: enclosing}
   end
 
-  @spec lookup(t(), name()) :: {:ok, SymbolInfo.t()} | :error
-  def lookup(%__MODULE__{} = table, name) do
-    case Map.fetch(table.symbols, name) do
-      {:ok, info} ->
-        {:ok, info}
+  @spec lookup_symbol(t(), name()) :: {:ok, SymbolInfo.t()} | :error
+  def lookup_symbol(%__MODULE__{enclosing: nil} = context, name) do
+    Map.fetch(context.symbols, name)
+  end
 
-      :error ->
-        if is_nil(table.surrounding) do
-          :error
-        else
-          lookup(table.surrounding, name)
-        end
+  def lookup_symbol(%__MODULE__{} = context, name) do
+    with(:error <- Map.fetch(context.symbols, name)) do
+      lookup_symbol(context.enclosing, name)
     end
   end
 
