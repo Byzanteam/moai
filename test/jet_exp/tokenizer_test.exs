@@ -34,7 +34,7 @@ defmodule JetExp.TokenizerTest do
                 {:number, 0.1},
                 {:string, "foo"},
                 {:string, "\\\"foo\\\""},
-                {:sigil, "~d"},
+                {:sigil, "d"},
                 {:string, "2022-01-01"},
                 # begin: for n in nums -> n + 1
                 :for,

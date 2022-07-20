@@ -28,7 +28,7 @@ defmodule JetExp.ParserTest do
     end
 
     test "sigil" do
-      assert {:ok, {:sigil, {"~d", "2022-01-01"}}} === parse("~d\"2022-01-01\"")
+      assert {:ok, {:sigil, ["d", "2022-01-01"]}} === parse("~d\"2022-01-01\"")
     end
 
     test "list" do

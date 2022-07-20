@@ -7,6 +7,7 @@ defmodule JetExp.Parser.Ast do
           | bool_node()
           | number_node()
           | string_node()
+          | object_node()
           | sigil_node()
           | list_node()
           | list_comp_node_binding()
@@ -22,6 +23,16 @@ defmodule JetExp.Parser.Ast do
   @type bool_node() :: boolean()
   @type number_node() :: number()
   @type string_node() :: String.t()
+
+  @type object_value() ::
+          nil
+          | nil_node()
+          | bool_node()
+          | number_node()
+          | string_node()
+          | [object_value()]
+
+  @type object_node() :: %{required(name()) => object_value()}
 
   @type sigil_node() :: {:sigil, args :: [t()]} | {:sigil, annotations(), args :: [t]}
 
@@ -60,9 +71,23 @@ defmodule JetExp.Parser.Ast do
     name
   end
 
+  @spec make_id(name()) :: id_node()
+  def make_id(name) do
+    {:id, name}
+  end
+
   @spec make_id(name(), annotations()) :: id_node()
   def make_id(name, annotations) do
     {:id, annotations, name}
+  end
+
+  @spec update_id(id_node(), name()) :: id_node()
+  def update_id({:id, annotations, _name}, name) do
+    {:id, annotations, name}
+  end
+
+  def update_id(_node, name) do
+    make_id(name)
   end
 
   @spec nil?(t()) :: boolean()
@@ -85,9 +110,14 @@ defmodule JetExp.Parser.Ast do
     is_binary(node)
   end
 
+  @spec object?(t()) :: boolean()
+  def object?(node) do
+    is_map(node)
+  end
+
   @spec literal?(t()) :: boolean()
   def literal?(node) do
-    nil?(node) or bool?(node) or number?(node) or string?(node)
+    nil?(node) or bool?(node) or number?(node) or string?(node) or object?(node)
   end
 
   @spec sigil?(t()) :: boolean()
@@ -107,6 +137,20 @@ defmodule JetExp.Parser.Ast do
   @spec make_sigil(args :: [t()]) :: sigil_node()
   def make_sigil(args) do
     {:sigil, args}
+  end
+
+  @spec make_sigil(args :: [t()], annotations()) :: sigil_node()
+  def make_sigil(args, annotations) do
+    {:sigil, annotations, args}
+  end
+
+  @spec update_sigil(sigil_node(), args :: [t()]) :: sigil_node()
+  def update_sigil({:sigil, annotations, _args}, args) do
+    {:sigil, annotations, args}
+  end
+
+  def update_sigil(_node, args) do
+    make_sigil(args)
   end
 
   @spec list?(t()) :: boolean()
@@ -132,6 +176,15 @@ defmodule JetExp.Parser.Ast do
   @spec make_list(args :: [t()], annotations()) :: list_node()
   def make_list(args, annotations) do
     {:"[]", annotations, args}
+  end
+
+  @spec update_list(list_node(), args :: [t]) :: list_node()
+  def update_list({:"[]", annotations, _args}, args) do
+    {:"[]", annotations, args}
+  end
+
+  def update_list(_node, args) do
+    make_list(args)
   end
 
   @spec list_comp?(t()) :: boolean()
@@ -204,6 +257,18 @@ defmodule JetExp.Parser.Ast do
     {:in, annotations, binding_args}
   end
 
+  @spec update_list_comp_binding(
+          list_comp_node_binding(),
+          list_comp_node_binding_args :: [t(), ...]
+        ) :: list_comp_node_binding()
+  def update_list_comp_binding({:in, annotations, _binding_args}, binding_args) do
+    {:in, annotations, binding_args}
+  end
+
+  def update_list_comp_binding(_node, binding_args) do
+    make_list_comp_binding(binding_args)
+  end
+
   @spec make_list_comp(list_comp_args :: [t(), ...]) :: list_comp_node()
   def make_list_comp(args) do
     {:for, args}
@@ -212,6 +277,15 @@ defmodule JetExp.Parser.Ast do
   @spec make_list_comp(list_comp_args :: [t(), ...], annotations()) :: list_comp_node()
   def make_list_comp(args, annotations) do
     {:for, annotations, args}
+  end
+
+  @spec update_list_comp(list_comp_node(), list_comp_args :: [t(), ...]) :: list_comp_node()
+  def update_list_comp({:for, annotations, _args}, args) do
+    {:for, annotations, args}
+  end
+
+  def update_list_comp(_node, args) do
+    make_list_comp(args)
   end
 
   @spec conditional?(t()) :: boolean()
@@ -287,6 +361,15 @@ defmodule JetExp.Parser.Ast do
     {call_id, annotations, args}
   end
 
+  @spec update_call(call_node(), args :: [t()]) :: call_node()
+  def update_call({id, annotations, _args}, args) do
+    {id, annotations, args}
+  end
+
+  def update_call(node, args) do
+    make_call(call_id(node), args)
+  end
+
   @ops %{
     arith: [:+, :-, :*, :/],
     logic: [:and, :or, :not],
@@ -332,6 +415,15 @@ defmodule JetExp.Parser.Ast do
     {operator, annotations, operands}
   end
 
+  @spec update_op(op_node(), operands :: [t()]) :: op_node()
+  def update_op({op, annotations, _operands}, operands) do
+    {op, annotations, operands}
+  end
+
+  def update_op(node, operands) do
+    make_op(op_operator(node), operands)
+  end
+
   defp atomic?(node) do
     id?(node) or literal?(node)
   end
@@ -350,35 +442,35 @@ defmodule JetExp.Parser.Ast do
 
       list?(node) ->
         {list_args, acc} = node |> list_args() |> do_traverse_args(acc, pre, post)
-        post.(make_list(list_args), acc)
+        post.(update_list(node, list_args), acc)
 
       sigil?(node) ->
         {args, acc} = node |> sigil_args() |> do_traverse_args(acc, pre, post)
-        post.(make_sigil(args), acc)
+        post.(update_sigil(node, args), acc)
 
       list_comp_binding?(node) ->
         [var, source_expr] = list_comp_binding_args(node)
         {source_expr, acc} = pre.(source_expr, acc)
         {source_expr, acc} = do_traverse(source_expr, acc, pre, post)
-        post.(make_list_comp_binding([var, source_expr]), acc)
+        post.(update_list_comp_binding(node, [var, source_expr]), acc)
 
       list_comp?(node) ->
         {args, acc} = node |> list_comp_args() |> do_traverse_args(acc, pre, post)
-        post.(make_list_comp(args), acc)
+        post.(update_list_comp(node, args), acc)
 
       call?(node) ->
         {args, acc} = node |> call_args() |> do_traverse_args(acc, pre, post)
-        post.(make_call(call_id(node), args), acc)
+        post.(update_call(node, args), acc)
 
       access_op?(node) ->
         [source_expr, accessor] = op_operands(node)
         {source_expr, acc} = pre.(source_expr, acc)
         {source_expr, acc} = do_traverse(source_expr, acc, pre, post)
-        post.(make_op(op_operator(node), [source_expr, accessor]), acc)
+        post.(update_op(node, [source_expr, accessor]), acc)
 
       op?(node) ->
         {operands, acc} = node |> op_operands() |> do_traverse_args(acc, pre, post)
-        post.(make_op(op_operator(node), operands), acc)
+        post.(update_op(node, operands), acc)
     end
   end
 
@@ -422,6 +514,9 @@ defmodule JetExp.Parser.Ast do
       list?(node) ->
         make_list(list_args(node), annotations)
 
+      sigil?(node) ->
+        make_sigil(sigil_args(node), annotations)
+
       list_comp_binding?(node) ->
         make_list_comp_binding(list_comp_binding_args(node), annotations)
 
@@ -443,6 +538,7 @@ defmodule JetExp.Parser.Ast do
   @spec extract_annotation(
           id_node()
           | list_node()
+          | sigil_node()
           | list_comp_node()
           | list_comp_node_binding()
           | call_node()

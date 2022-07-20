@@ -33,16 +33,7 @@ defmodule JetExp.Typing.Annotator do
 
   defp infer(node, context) do
     cond do
-      Ast.nil?(node) ->
-        :skip
-
-      Ast.bool?(node) ->
-        :skip
-
-      Ast.number?(node) ->
-        :skip
-
-      Ast.string?(node) ->
+      Ast.literal?(node) ->
         :skip
 
       Ast.id?(node) ->
@@ -77,6 +68,9 @@ defmodule JetExp.Typing.Annotator do
 
       Ast.access_op?(node) ->
         infer_access_op(node)
+
+      true ->
+        :skip
     end
   end
 
@@ -286,11 +280,26 @@ defmodule JetExp.Typing.Annotator do
       Ast.string?(node) ->
         {:ok, :string}
 
+      Ast.object?(node) ->
+        extract_object_type(node)
+
       true ->
         with(:error <- Ast.extract_annotation(node, :type)) do
           {:ok, errors} = Ast.extract_annotation(node, :errors)
           {:error, errors}
         end
     end
+  end
+
+  defp extract_object_type(node) do
+    Enum.reduce_while(node, {:ok, %{}}, fn {k, v}, {:ok, acc} ->
+      case extract_type(v) do
+        {:ok, type} ->
+          {:cont, {:ok, Map.put(acc, k, type)}}
+
+        error ->
+          {:halt, error}
+      end
+    end)
   end
 end

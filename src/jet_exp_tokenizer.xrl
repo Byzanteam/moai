@@ -31,7 +31,7 @@ false : {token, {bool, TokenLine, false}}.
 
 {ID} : {token, {id, TokenLine, list_to_binary(TokenChars)}}.
 
-~{ID} : {token, {sigil, TokenLine, list_to_binary(TokenChars)}}.
+~{ID} : {token, {sigil, TokenLine, build_sigil(TokenChars)}}.
 
 ,  : {token, {',', TokenLine}}.
 \( : {token, {'(', TokenLine}}.
@@ -64,3 +64,7 @@ trim_string_tail(<<"\"">>) -> <<>>;
 trim_string_tail(<<C, BinTail/binary>>) ->
   NewBinTail = trim_string_tail(BinTail),
   <<C, NewBinTail/binary>>.
+
+build_sigil(TokenChars) ->
+  <<"~", SigilName/binary>> = list_to_binary(TokenChars),
+  SigilName.

@@ -91,7 +91,7 @@ build_nil() -> nil.
 
 build_literal({_Category, _TokenLine, Value}) -> Value.
 
-build_sigil({sigil, _TokenLine, Sigil}, Value) -> {sigil, {Sigil, Value}}.
+build_sigil({sigil, _TokenLine, Sigil}, Value) -> {sigil, [Sigil, Value]}.
 
 build_op({Op, _TokenLine}) -> Op.
 
