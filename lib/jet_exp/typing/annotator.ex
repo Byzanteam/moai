@@ -75,6 +75,9 @@ defmodule JetExp.Typing.Annotator do
 
       Ast.comp_op?(node) ->
         infer_comp_op(node)
+
+      Ast.access_op?(node) ->
+        infer_access_op(node)
     end
   end
 
@@ -225,6 +228,25 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
+  defp infer_access_op(node) do
+    [source_expr, accessor] = Ast.op_operands(node)
+    accessor_name = Ast.id_name(accessor)
+
+    case extract_type(source_expr) do
+      {:ok, %{} = type} when is_map_key(type, accessor_name) ->
+        {:ok, Map.fetch!(type, accessor_name)}
+
+      {:ok, %{} = type} ->
+        {:error, reason: :key_not_found, keys: Map.keys(type)}
+
+      {:ok, _type} ->
+        type_slaps(:%{})
+
+      error ->
+        error
+    end
+  end
+
   defp has_type?(node, type) do
     case extract_type(node) do
       {:ok, ^type} ->
@@ -233,8 +255,8 @@ defmodule JetExp.Typing.Annotator do
       {:ok, _type} ->
         type_slaps(type)
 
-      {:error, errors} ->
-        {:error, errors}
+      error ->
+        error
     end
   end
 

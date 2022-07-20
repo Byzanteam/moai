@@ -34,6 +34,9 @@ defmodule JetExp.Core.Interpreter do
       Ast.comp_op?(node) ->
         eval_comp(node, env)
 
+      Ast.access_op?(node) ->
+        eval_access(node, env)
+
       Ast.list_comp?(node) ->
         eval_list_comp(node, env)
     end
@@ -195,6 +198,19 @@ defmodule JetExp.Core.Interpreter do
   defp eval_binary_op(operands, env, fun) do
     with({:ok, [left, right]} <- eval_required_args(operands, env)) do
       {:ok, fun.(left, right)}
+    end
+  end
+
+  defp eval_access(node, env) do
+    [source, accessor] = Ast.op_operands(node)
+    accessor_name = Ast.id_name(accessor)
+
+    case eval(source, env) do
+      {:ok, %{} = source_value} when is_map_key(source_value, accessor_name) ->
+        {:ok, Map.fetch!(source_value, accessor_name)}
+
+      _result ->
+        :error
     end
   end
 

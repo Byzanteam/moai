@@ -58,7 +58,7 @@ operation -> expr rel_op expr : {build_op('$2'), ['$1', '$3']}.
 operation -> expr add_op expr : {build_op('$2'), ['$1', '$3']}.
 operation -> expr mult_op expr : {build_op('$2'), ['$1', '$3']}.
 operation -> unary_op expr : build_unary_op_expr(build_op('$1'), '$2').
-operation -> expr dot_op id : {access, ['$1', build_id('$3')]}.
+operation -> expr dot_op id : {build_op('$2'), ['$1', build_id('$3')]}.
 
 or_op -> 'or' : '$1'.
 and_op -> 'and' : '$1'.

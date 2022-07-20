@@ -285,6 +285,52 @@ defmodule JetExp.Typing.AnnotatorTest do
     end
   end
 
+  describe "access operation" do
+    test "works" do
+      symbol_table =
+        build_symbol_table(%{
+          "obj" => %{
+            type: %{
+              "name" => :string,
+              "age" => :number
+            }
+          }
+        })
+
+      assert {:ok, :string} === extract_type("obj.name", symbol_table)
+      assert {:ok, :number} === extract_type("obj.age", symbol_table)
+
+      symbol_table =
+        build_symbol_table(%{
+          "fun" => %{
+            type:
+              {:fun,
+               [
+                 %{
+                   "name" => :string,
+                   "age" => :number
+                 }
+               ]}
+          }
+        })
+
+      assert {:ok, :string} === extract_type("fun().name", symbol_table)
+      assert {:ok, :number} === extract_type("fun().age", symbol_table)
+    end
+
+    test "fails on type slaps" do
+      symbol_table = build_symbol_table(%{"obj" => %{type: :number}})
+
+      assert {:error, reason: :type_slaps, expected_type: :%{}} ===
+               extract_type("obj.name", symbol_table)
+
+      symbol_table = build_symbol_table(%{"obj" => %{type: %{"name" => :string}}})
+
+      assert {:error, reason: :key_not_found, keys: ["name"]} ===
+               extract_type("obj.age", symbol_table)
+    end
+  end
+
   defp extract_type(code, symbol_table \\ JetExp.SymbolTable.new(%{})) do
     {:ok, tokens} = JetExp.Tokenizer.tokenize(code)
     {:ok, ast} = JetExp.Parser.parse(tokens)

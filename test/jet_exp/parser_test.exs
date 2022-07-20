@@ -140,7 +140,7 @@ defmodule JetExp.ParserTest do
     end
 
     test "dot" do
-      assert {:ok, {:access, [{:id, "checkbox"}, {:id, "options"}]}} === parse("checkbox.options")
+      assert {:ok, {:., [{:id, "checkbox"}, {:id, "options"}]}} === parse("checkbox.options")
     end
 
     test "precedence" do

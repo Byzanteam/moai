@@ -33,7 +33,8 @@ defmodule JetExp.Parser.Ast do
 
   @type call_node() :: {id_node(), args :: [t()]} | {id_node(), annotations(), args :: [t()]}
 
-  @typep operator() :: :+ | :- | :* | :/ | :and | :or | :not | :== | :!= | :< | :> | :<= | :>=
+  @typep operator() ::
+           :+ | :- | :* | :/ | :and | :or | :not | :== | :!= | :< | :> | :<= | :>= | :.
   @type op_node() ::
           {operator(), operands :: [t(), ...]}
           | {operator(), annotations(), operands :: [t(), ...]}
@@ -268,7 +269,8 @@ defmodule JetExp.Parser.Ast do
     arith: [:+, :-, :*, :/],
     logic: [:and, :or, :not],
     comp: [:==, :!=],
-    rel: [:<, :>, :<=, :>=]
+    rel: [:<, :>, :<=, :>=],
+    access: [:.]
   }
 
   for {category, ops} <- @ops do
@@ -285,7 +287,7 @@ defmodule JetExp.Parser.Ast do
 
   @spec op?(t()) :: boolean()
   def op?(node) do
-    arith_op?(node) or logic_op?(node) or comp_op?(node) or rel_op?(node)
+    arith_op?(node) or logic_op?(node) or comp_op?(node) or rel_op?(node) or access_op?(node)
   end
 
   @spec op_operator(op_node()) :: operator()
@@ -327,6 +329,11 @@ defmodule JetExp.Parser.Ast do
 
       call?(node) ->
         walk_node_with_args(node, &call_args/1, &make_call(call_id(node), &1), acc, fun)
+
+      access_op?(node) ->
+        [source_expr, accessor] = op_operands(node)
+        {source_expr, acc} = postwalk(source_expr, acc, fun)
+        fun.(make_op(op_operator(node), [source_expr, accessor]), acc)
 
       op?(node) ->
         walk_node_with_args(node, &op_operands/1, &make_op(op_operator(node), &1), acc, fun)

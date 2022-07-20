@@ -174,6 +174,14 @@ defmodule JetExp.Core.InterpreterTest do
     end
   end
 
+  describe "access" do
+    test "works" do
+      env = %{"obj" => %{"name" => "foo", "age" => 1}}
+      assert {:ok, "foo"} === eval("obj.name", env)
+      assert {:ok, 1} === eval("obj.age", env)
+    end
+  end
+
   describe "list_comp" do
     test "works" do
       assert {:ok, [2, 3, 4]} ===
