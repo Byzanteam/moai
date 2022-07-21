@@ -346,8 +346,16 @@ defmodule JetExp.Parser.Ast do
     id
   end
 
+  def call_id({id, _annotations, _args}) do
+    id
+  end
+
   @spec call_args(call_node()) :: [t()]
   def call_args({_id, args}) do
+    args
+  end
+
+  def call_args({_id, _annotations, args}) do
     args
   end
 
