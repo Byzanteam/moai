@@ -92,4 +92,9 @@ defmodule JetExp.Core.Interpreter.Env do
       lookup(env.enclosing, name)
     end
   end
+
+  @spec install_bindings(t(), bindings()) :: t()
+  def install_bindings(%__MODULE__{} = env, bindings) do
+    Map.update!(env, :bindings, &Map.merge(&1, bindings))
+  end
 end

@@ -1,6 +1,8 @@
 defmodule JetExp.Core.Library.Bool do
   @moduledoc false
 
+  use JetExp.Core.Library.Builder
+
   @doc """
   Returns true if all elements of the list is true, otherwise false.
   Returns true for empty list.
@@ -16,6 +18,7 @@ defmodule JetExp.Core.Library.Bool do
     iex> bool_and_a([])
     {:ok, true}
   """
+  @fun_meta {:bool_and_a, signature: [[:bool], :bool]}
   @spec bool_and_a([boolean()]) :: {:ok, boolean()}
   def bool_and_a(bools) do
     {:ok, Enum.all?(bools, & &1)}
@@ -35,6 +38,7 @@ defmodule JetExp.Core.Library.Bool do
     iex> bool_or_a([])
     {:ok, false}
   """
+  @fun_meta {:bool_or_a, signature: [[:bool], :bool]}
   @spec bool_or_a([boolean()]) :: {:ok, boolean()}
   def bool_or_a(bools) do
     {:ok, Enum.any?(bools, & &1)}

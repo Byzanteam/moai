@@ -50,6 +50,11 @@ defmodule JetExp.Parser.Context do
     %__MODULE__{symbols: symbols, enclosing: enclosing}
   end
 
+  @spec install_symbols(t(), symbols()) :: t()
+  def install_symbols(%__MODULE__{} = context, symbols) do
+    Map.update!(context, :symbols, &Map.merge(&1, symbols))
+  end
+
   @spec install_macros(t(), macros()) :: t()
   def install_macros(%__MODULE__{} = context, macros) do
     Map.update!(context, :macros, &Map.merge(&1, macros))
