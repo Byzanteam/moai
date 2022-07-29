@@ -21,7 +21,7 @@ defmodule JetExp.Core.Macro.SigilTest do
   defp expand(code) do
     {:ok, tokens} = JetExp.Tokenizer.tokenize(code)
     {:ok, ast} = JetExp.Parser.parse(tokens)
-    context = %{} |> JetExp.Parser.Context.new() |> JetExp.Core.Macro.Sigil.BuiltIn.install()
+    context = [] |> JetExp.Parser.Context.new() |> JetExp.Core.Macro.Sigil.BuiltIn.install()
     {ast, _acc} = JetExp.Parser.Ast.prewalk(ast, context, &JetExp.Core.Macro.expander/2)
     ast
   end

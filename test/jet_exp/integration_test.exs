@@ -10,10 +10,14 @@ defmodule JetExp.IntegrationTest do
     date_t = %{"year" => :number, "month" => :number, "day" => :number}
 
     context =
-      %{
-        "ds" => SymbolInfo.new(%{type: [date_t]}),
-        "date_diff_days" => SymbolInfo.new(%{type: {:fun, [date_t, date_t, :number]}})
-      }
+      [
+        symbols: %{
+          "ds" => SymbolInfo.new(%{type: [date_t]})
+        },
+        functions: %{
+          "date_diff_days" => [SymbolInfo.new(%{type: {:fun, [date_t, date_t, :number]}})]
+        }
+      ]
       |> JetExp.Parser.Context.new()
       |> JetExp.Core.Macro.Sigil.BuiltIn.install()
 

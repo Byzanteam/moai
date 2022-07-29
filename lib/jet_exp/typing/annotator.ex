@@ -78,7 +78,7 @@ defmodule JetExp.Typing.Annotator do
     name = Ast.id_name(node)
 
     case Context.lookup_symbol(context, name) do
-      {:ok, info} ->
+      {:ok, info} when not is_list(info) ->
         {:ok, SymbolInfo.extract(info, :type)}
 
       :error ->
@@ -107,7 +107,8 @@ defmodule JetExp.Typing.Annotator do
 
     case extract_type(source_expr) do
       {:ok, [type]} ->
-        context = Context.new(%{Ast.id_name(var) => SymbolInfo.new(%{type: type})}, context)
+        context =
+          Context.new(context, symbols: %{Ast.id_name(var) => SymbolInfo.new(%{type: type})})
 
         {:ok, type, context}
 
@@ -160,47 +161,59 @@ defmodule JetExp.Typing.Annotator do
   end
 
   defp infer_call(node, context) do
-    case node |> Ast.call_id() |> infer_id(context) do
-      {:ok, {:fun, _type} = fun_type} ->
-        do_infer_call(fun_type, Ast.call_args(node))
+    fun_name = node |> Ast.call_id() |> Ast.id_name()
+    args = Ast.call_args(node)
 
-      {:ok, _type} ->
-        type_slaps(:fun)
+    context
+    |> Context.lookup_functions(fun_name, &select_fun(&1, args))
+    |> Enum.map(fn symbol_info ->
+      symbol_info
+      |> SymbolInfo.extract(:type)
+      |> elem(1)
+    end)
+    |> do_infer_call(fun_name, args)
+  end
 
-      error ->
-        error
+  defp select_fun(symbol_info, args) do
+    args_count = length(args)
+
+    case SymbolInfo.extract(symbol_info, :type) do
+      {:fun, [_ | _] = arg_and_ret_types} when length(arg_and_ret_types) - 1 === args_count ->
+        true
+
+      _other ->
+        false
     end
   end
 
-  defp do_infer_call({:fun, [_ | _] = arg_and_ret_types}, args) do
-    expected_args_count = length(arg_and_ret_types) - 1
-
-    if expected_args_count === length(args) do
-      do_infer_call(arg_and_ret_types, args)
-    else
-      {:error, reason: :arity, expected_arg_count: expected_args_count}
-    end
+  defp do_infer_call([], fun_name, _args) do
+    {:error, reason: :not_exists, id: fun_name}
   end
 
-  defp do_infer_call({:fun, {arg_type, ret_type}}, args) do
-    check_homogeneous(args, arg_type, ret_type)
-  end
-
-  defp do_infer_call([ret_type], []) do
+  defp do_infer_call([[ret_type]], _fun_name, []) do
     {:ok, ret_type}
   end
 
-  defp do_infer_call([arg_type | arg_types], [arg | args]) do
-    case extract_type(arg) do
-      {:ok, ^arg_type} ->
-        do_infer_call({:fun, arg_types}, args)
+  defp do_infer_call(_funs, fun_name, []) do
+    {:error, reason: :not_exists, id: fun_name}
+  end
 
-      {:ok, _type} ->
-        type_slaps(arg_type)
-
-      error ->
-        error
+  defp do_infer_call(funs, fun_name, [arg | args]) do
+    with({:ok, arg_type} <- extract_type(arg)) do
+      funs
+      |> narrow_funs(arg_type)
+      |> do_infer_call(fun_name, args)
     end
+  end
+
+  defp narrow_funs(funs, arg_type) do
+    List.foldl(funs, [], fn
+      [^arg_type | arg_and_ret_types], acc ->
+        [arg_and_ret_types | acc]
+
+      _fun_type, acc ->
+        acc
+    end)
   end
 
   defp infer_op(node, expected_type, final_type) do

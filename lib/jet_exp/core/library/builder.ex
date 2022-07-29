@@ -18,7 +18,7 @@ defmodule JetExp.Core.Library.Builder do
     quote location: :keep do
       @spec install_symbols(context) :: context when context: JetExp.Parser.Context.t()
       def install_symbols(context) do
-        JetExp.Parser.Context.install_symbols(context, unquote(fun_symbols))
+        JetExp.Parser.Context.install_functions(context, unquote(fun_symbols))
       end
 
       @spec install_bindings(env) :: env when env: JetExp.Core.Interpreter.Env.t()
@@ -40,7 +40,7 @@ defmodule JetExp.Core.Library.Builder do
   end
 
   @default_extra_args []
-  @default_fun_opts [require_args: true]
+  @default_fun_opts [require_args: true, variadic: false]
 
   defp build_fun_bindings(fun_meta, module) do
     Map.new(fun_meta, fn {fun_name, meta} ->

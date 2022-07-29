@@ -86,7 +86,7 @@ defmodule JetExp.Core.Interpreter do
   end
 
   defp eval_fun_args(fun, args, env) do
-    if Env.Function.require_args?(fun) do
+    if fun.require_args do
       eval_required_args(args, env)
     else
       eval_args(args, env)

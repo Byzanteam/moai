@@ -109,13 +109,17 @@ defmodule JetExp.Typing.AnnotatorTest do
   describe "call" do
     test "works" do
       symbol_table =
-        build_symbol_table(%{
-          "dummy_fun" => %{
-            type: {:fun, [:number, :bool, :dummy_type]}
+        build_symbol_table(
+          %{
+            "x" => %{type: :number},
+            "y" => %{type: :bool}
           },
-          "x" => %{type: :number},
-          "y" => %{type: :bool}
-        })
+          %{
+            "dummy_fun" => %{
+              type: {:fun, [:number, :bool, :dummy_type]}
+            }
+          }
+        )
 
       assert {:ok, :dummy_type} === extract_type("dummy_fun(x, y)", symbol_table)
     end
@@ -129,62 +133,82 @@ defmodule JetExp.Typing.AnnotatorTest do
 
       assert {:error, reason: :not_exists, id: "dummy_fun"} ===
                extract_type("dummy_fun(x, y)", symbol_table)
-    end
 
-    test "fails on type slaps" do
       symbol_table =
-        build_symbol_table(%{
-          "dummy_fun" => %{
-            type: {:fun, [:number, :bool, :dummy_type]}
+        build_symbol_table(
+          %{
+            "x" => %{type: :dummy_type},
+            "y" => %{type: :bool}
           },
-          "x" => %{type: :dummy_type},
-          "y" => %{type: :bool}
-        })
+          %{
+            "dummy_fun" => %{
+              type: {:fun, [:number, :bool, :dummy_type]}
+            }
+          }
+        )
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, reason: :not_exists, id: "dummy_fun"} ===
                extract_type("dummy_fun(x, y)", symbol_table)
-    end
 
-    test "fails when calling with incorrect arity" do
       symbol_table =
-        build_symbol_table(%{
-          "dummy_fun" => %{
-            type: {:fun, [:number, :bool, :dummy_type]}
+        build_symbol_table(
+          %{
+            "x" => %{type: :number}
           },
-          "x" => %{type: :number}
-        })
+          %{
+            "dummy_fun" => %{
+              type: {:fun, [:number, :bool, :dummy_type]}
+            }
+          }
+        )
 
-      assert {:error, reason: :arity, expected_arg_count: 2} ===
+      assert {:error, reason: :not_exists, id: "dummy_fun"} ===
                extract_type("dummy_fun(x)", symbol_table)
     end
   end
 
-  describe "call with rest args" do
+  describe "call with overloading" do
     test "works" do
       symbol_table =
-        build_symbol_table(%{
-          "dummy_fun" => %{
-            type: {:fun, {:number, :dummy_type}}
+        build_symbol_table(
+          %{
+            "x" => %{type: :number},
+            "y" => %{type: :number},
+            "z" => %{type: :string}
           },
-          "x" => %{type: :number},
-          "y" => %{type: :number}
-        })
+          %{
+            "dummy_fun" => [
+              %{type: {:fun, [:number, :number]}},
+              %{type: {:fun, [:number, :number, :bool]}},
+              %{type: {:fun, [:number, :string, :string]}}
+            ]
+          }
+        )
 
-      assert {:ok, :dummy_type} === extract_type("dummy_fun(x, y)", symbol_table)
+      assert {:ok, :number} === extract_type("dummy_fun(x)", symbol_table)
+      assert {:ok, :bool} === extract_type("dummy_fun(x, y)", symbol_table)
+      assert {:ok, :string} === extract_type("dummy_fun(x, z)", symbol_table)
     end
 
-    test "fails on type slaps" do
+    test "fails" do
       symbol_table =
-        build_symbol_table(%{
-          "dummy_fun" => %{
-            type: {:fun, {:number, :dummy_type}}
+        build_symbol_table(
+          %{
+            "x" => %{type: :number},
+            "y" => %{type: :string}
           },
-          "x" => %{type: :number},
-          "y" => %{type: :bool}
-        })
+          %{
+            "dummy_fun" => [
+              %{type: {:fun, [:number, :number]}},
+              %{type: {:fun, [:number, :number, :bool]}},
+              %{type: {:fun, [:number, :string, :string]}},
+              %{type: {:fun, {:number, :number}}}
+            ]
+          }
+        )
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
-               extract_type("dummy_fun(x, y)", symbol_table)
+      assert {:error, reason: :not_exists, id: "dummy_fun"} ===
+               extract_type("dummy_fun(y, x)", symbol_table)
     end
   end
 
@@ -301,7 +325,7 @@ defmodule JetExp.Typing.AnnotatorTest do
       assert {:ok, :number} === extract_type("obj.age", symbol_table)
 
       symbol_table =
-        build_symbol_table(%{
+        build_symbol_table(%{}, %{
           "fun" => %{
             type:
               {:fun,
@@ -331,7 +355,7 @@ defmodule JetExp.Typing.AnnotatorTest do
     end
   end
 
-  defp extract_type(code, symbol_table \\ JetExp.Parser.Context.new(%{})) do
+  defp extract_type(code, symbol_table \\ JetExp.Parser.Context.new([])) do
     {:ok, tokens} = JetExp.Tokenizer.tokenize(code)
     {:ok, ast} = JetExp.Parser.parse(tokens)
 
@@ -341,11 +365,21 @@ defmodule JetExp.Typing.AnnotatorTest do
     JetExp.Typing.Annotator.extract_type(aast)
   end
 
-  defp build_symbol_table(symbols) do
-    symbols
-    |> Map.new(fn {name, info} ->
-      {name, JetExp.Parser.Context.SymbolInfo.new(info)}
-    end)
-    |> JetExp.Parser.Context.new()
+  defp build_symbol_table(symbols, functions \\ %{}) do
+    symbols =
+      Map.new(symbols, fn {name, info} ->
+        {name, JetExp.Parser.Context.SymbolInfo.new(info)}
+      end)
+
+    functions =
+      Map.new(functions, fn
+        {name, [_ | _] = infos} ->
+          {name, Enum.map(infos, &JetExp.Parser.Context.SymbolInfo.new/1)}
+
+        {name, info} ->
+          {name, [JetExp.Parser.Context.SymbolInfo.new(info)]}
+      end)
+
+    JetExp.Parser.Context.new(symbols: symbols, functions: functions)
   end
 end

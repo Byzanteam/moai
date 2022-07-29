@@ -10,26 +10,30 @@ defmodule JetExp.Core.Interpreter.Env do
             module: module(),
             fun: atom(),
             extra_args: [term()],
-            opts: opts()
+            require_args: boolean(),
+            variadic: boolean()
           }
 
     @enforce_keys [:module, :fun]
     defstruct [
       :module,
       :fun,
-      extra_args: [],
-      opts: []
+      :require_args,
+      :variadic,
+      extra_args: []
     ]
 
-    @default_opts [require_args: true]
-
     @spec new(module(), fun :: atom(), extra_args :: [term()], opts()) :: t()
-    def new(module, fun, extra_args \\ [], opts \\ @default_opts) do
+    def new(module, fun, extra_args \\ [], opts \\ []) do
+      require_args = Keyword.get(opts, :require_args, true)
+      variadic = Keyword.get(opts, :require_args, false)
+
       %__MODULE__{
         module: module,
         fun: fun,
         extra_args: extra_args,
-        opts: opts
+        require_args: require_args,
+        variadic: variadic
       }
     end
 
@@ -40,11 +44,6 @@ defmodule JetExp.Core.Interpreter.Env do
 
     def apply(%__MODULE__{} = fun, args) do
       Kernel.apply(fun.module, fun.fun, args ++ fun.extra_args)
-    end
-
-    @spec require_args?(t()) :: boolean()
-    def require_args?(%__MODULE__{} = fun) do
-      Keyword.get(fun.opts, :require_args, true)
     end
   end
 

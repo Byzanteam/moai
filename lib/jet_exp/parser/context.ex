@@ -25,34 +25,62 @@ defmodule JetExp.Parser.Context do
   @typep name() :: String.t()
 
   @typep symbols() :: %{required(name()) => SymbolInfo.t()}
+  @typep functions() :: %{required(name()) => [SymbolInfo.t(), ...]}
   @typep macros() :: %{required(name()) => JetExp.Core.Macro.t()}
 
   @type t() :: %__MODULE__{
           enclosing: t() | nil,
           symbols: symbols(),
+          functions: functions(),
           macros: macros()
         }
 
-  @enforce_keys [:symbols]
   defstruct [
     :enclosing,
     :symbols,
-    macros: %{}
+    :functions,
+    :macros
   ]
 
-  @spec new(symbols()) :: t()
-  def new(symbols) do
-    %__MODULE__{symbols: symbols}
+  @typep new_params :: [
+           symbols: symbols(),
+           functions: functions(),
+           macros: macros()
+         ]
+
+  @spec new(new_params()) :: t()
+  def new(params) do
+    symbols = Keyword.get(params, :symbols, %{})
+    functions = Keyword.get(params, :functions, %{})
+    macros = Keyword.get(params, :macros, %{})
+
+    %__MODULE__{symbols: symbols, functions: functions, macros: macros}
   end
 
-  @spec new(symbols(), enclosing :: t()) :: t()
-  def new(symbols, enclosing) do
-    %__MODULE__{symbols: symbols, enclosing: enclosing}
+  @spec new(enclosing :: t(), new_params()) :: t()
+  def new(enclosing, params) do
+    %{new(params) | enclosing: enclosing}
   end
 
-  @spec install_symbols(t(), symbols()) :: t()
-  def install_symbols(%__MODULE__{} = context, symbols) do
-    Map.update!(context, :symbols, &Map.merge(&1, symbols))
+  @spec install_functions(t(), functions()) :: t()
+  def install_functions(%__MODULE__{} = context, functions) do
+    Map.update!(
+      context,
+      :functions,
+      &Map.merge(&1, functions, fn _key, values1, values2 ->
+        insert_new_functions(values1, values2)
+      end)
+    )
+  end
+
+  defp insert_new_functions(functions1, functions2) do
+    Enum.reduce(functions2, functions1, fn function, acc ->
+      if Enum.member?(acc, function) do
+        acc
+      else
+        [function | acc]
+      end
+    end)
   end
 
   @spec install_macros(t(), macros()) :: t()
@@ -68,6 +96,35 @@ defmodule JetExp.Parser.Context do
   def lookup_symbol(%__MODULE__{} = context, name) do
     with(:error <- Map.fetch(context.symbols, name)) do
       lookup_symbol(context.enclosing, name)
+    end
+  end
+
+  @spec lookup_functions(t(), name(), predicate :: (SymbolInfo.t() -> boolean())) ::
+          [SymbolInfo.t()]
+  def lookup_functions(%__MODULE__{enclosing: nil} = context, name, predicate) do
+    case Map.fetch(context.functions, name) do
+      {:ok, functions} ->
+        Enum.filter(functions, predicate)
+
+      :error ->
+        []
+    end
+  end
+
+  def lookup_functions(context, name, predicate) do
+    case Map.fetch(context.functions, name) do
+      {:ok, functions} ->
+        functions = Enum.filter(functions, predicate)
+
+        functions ++
+          lookup_functions(
+            context.enclosing,
+            name,
+            &(not Enum.member?(functions, &1) and predicate.(&1))
+          )
+
+      :error ->
+        lookup_functions(context.enclosing, name, predicate)
     end
   end
 
