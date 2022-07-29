@@ -342,6 +342,26 @@ defmodule JetExp.Typing.AnnotatorTest do
       assert {:ok, :number} === extract_type("fun().age", symbol_table)
     end
 
+    test "works with type aliases" do
+      alias JetExp.Parser.Context
+
+      symbol_table =
+        [
+          symbols: %{"obj" => Context.SymbolInfo.new(%{type: "dummy_obj"})},
+          functions: %{
+            "fun" => [Context.SymbolInfo.new(%{type: {:fun, ["dummy_obj"]}})]
+          }
+        ]
+        |> Context.new()
+        |> Context.install_type_aliases(%{"dummy_obj" => %{"name" => :string, "age" => :number}})
+
+      assert {:ok, :string} === extract_type("obj.name", symbol_table)
+      assert {:ok, :number} === extract_type("obj.age", symbol_table)
+
+      assert {:ok, :string} === extract_type("fun().name", symbol_table)
+      assert {:ok, :number} === extract_type("fun().age", symbol_table)
+    end
+
     test "fails on type slaps" do
       symbol_table = build_symbol_table(%{"obj" => %{type: :number}})
 

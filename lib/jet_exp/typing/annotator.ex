@@ -67,7 +67,7 @@ defmodule JetExp.Typing.Annotator do
         infer_comp_op(node)
 
       Ast.access_op?(node) ->
-        infer_access_op(node)
+        infer_access_op(node, context)
 
       true ->
         :skip
@@ -233,16 +233,12 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
-  defp infer_access_op(node) do
+  defp infer_access_op(node, context) do
     [source_expr, accessor] = Ast.op_operands(node)
-    accessor_name = Ast.id_name(accessor)
 
-    case extract_type(source_expr) do
-      {:ok, %{} = type} when is_map_key(type, accessor_name) ->
-        {:ok, Map.fetch!(type, accessor_name)}
-
+    case extract_type_expand_alias(source_expr, context) do
       {:ok, %{} = type} ->
-        {:error, reason: :key_not_found, keys: Map.keys(type)}
+        do_infer_access_op(type, Ast.id_name(accessor))
 
       {:ok, _type} ->
         type_slaps(:%{})
@@ -250,6 +246,15 @@ defmodule JetExp.Typing.Annotator do
       error ->
         error
     end
+  end
+
+  defp do_infer_access_op(object_type, accessor_name)
+       when is_map_key(object_type, accessor_name) do
+    {:ok, Map.fetch!(object_type, accessor_name)}
+  end
+
+  defp do_infer_access_op(object_type, _accessor_name) do
+    {:error, reason: :key_not_found, keys: Map.keys(object_type)}
   end
 
   defp has_type?(node, type) do
@@ -278,7 +283,7 @@ defmodule JetExp.Typing.Annotator do
   end
 
   @spec extract_type(Ast.t() | Ast.list_comp_node_binding()) ::
-          {:ok, Types.t()} | {:error, errors()}
+          {:ok, Types.t() | Types.alias()} | {:error, errors()}
   def extract_type(node) do
     cond do
       Ast.nil?(node) ->
@@ -301,6 +306,12 @@ defmodule JetExp.Typing.Annotator do
           {:ok, errors} = Ast.extract_annotation(node, :errors)
           {:error, errors}
         end
+    end
+  end
+
+  defp extract_type_expand_alias(node, context) do
+    with({:ok, type_alias} when is_binary(type_alias) <- extract_type(node)) do
+      {:ok, _type} = Context.lookup_type(context, type_alias)
     end
   end
 

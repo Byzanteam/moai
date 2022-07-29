@@ -54,7 +54,10 @@ defmodule JetExp.Parser.Ast do
           | {operator(), annotations(), operands :: [t(), ...]}
 
   @typep errors() :: Keyword.t()
-  @type annotations() :: [type: JetExp.Typing.Types.t(), errors: errors()]
+  @type annotations() :: [
+          type: JetExp.Typing.Types.t() | JetExp.Typing.Types.alias(),
+          errors: errors()
+        ]
 
   @spec id?(t()) :: boolean()
   def id?(node) do
@@ -552,7 +555,9 @@ defmodule JetExp.Parser.Ast do
           | call_node()
           | op_node(),
           key :: :type | :errors
-        ) :: {:ok, JetExp.Typing.Types.t() | errors()} | :error
+        ) ::
+          {:ok, JetExp.Typing.Types.t() | JetExp.Typing.Types.alias() | errors()}
+          | :error
   def extract_annotation(node, key) do
     {_category, annotations, _args} = node
     Keyword.fetch(annotations, key)

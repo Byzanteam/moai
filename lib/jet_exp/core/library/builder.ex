@@ -40,7 +40,7 @@ defmodule JetExp.Core.Library.Builder do
   end
 
   @default_extra_args []
-  @default_fun_opts [require_args: true, variadic: false]
+  @default_fun_opts [require_args: true]
 
   defp build_fun_bindings(fun_meta, module) do
     Map.new(fun_meta, fn {fun_name, meta} ->

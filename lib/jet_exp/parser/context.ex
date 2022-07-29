@@ -4,19 +4,24 @@ defmodule JetExp.Parser.Context do
   defmodule SymbolInfo do
     @moduledoc false
 
-    @type t() :: %__MODULE__{type: JetExp.Typing.Types.t()}
+    @type t() :: %__MODULE__{
+            type: JetExp.Typing.Types.t() | JetExp.Typing.Types.alias()
+          }
 
     @enforce_keys [:type]
     defstruct [:type]
 
-    @spec new(%{required(:type) => JetExp.Typing.Types.t(), optional(term()) => term()}) :: t()
+    @spec new(%{
+            required(:type) => JetExp.Typing.Types.t() | JetExp.Typing.Types.alias(),
+            optional(term()) => term()
+          }) :: t()
     def new(params) do
       %__MODULE__{
         type: Map.fetch!(params, :type)
       }
     end
 
-    @spec extract(t(), :type) :: JetExp.Typing.Types.t()
+    @spec extract(t(), :type) :: JetExp.Typing.Types.t() | JetExp.Typing.Types.alias()
     def extract(%__MODULE__{} = symbol_info, :type) do
       symbol_info.type
     end
@@ -28,18 +33,22 @@ defmodule JetExp.Parser.Context do
   @typep functions() :: %{required(name()) => [SymbolInfo.t(), ...]}
   @typep macros() :: %{required(name()) => JetExp.Core.Macro.t()}
 
+  @type type_aliases() :: %{required(JetExp.Typing.Types.alias()) => JetExp.Typing.Types.t()}
+
   @type t() :: %__MODULE__{
           enclosing: t() | nil,
           symbols: symbols(),
           functions: functions(),
-          macros: macros()
+          macros: macros(),
+          type_aliases: type_aliases()
         }
 
   defstruct [
     :enclosing,
     :symbols,
     :functions,
-    :macros
+    :macros,
+    type_aliases: %{}
   ]
 
   @typep new_params :: [
@@ -86,6 +95,11 @@ defmodule JetExp.Parser.Context do
   @spec install_macros(t(), macros()) :: t()
   def install_macros(%__MODULE__{} = context, macros) do
     Map.update!(context, :macros, &Map.merge(&1, macros))
+  end
+
+  @spec install_type_aliases(t(), type_aliases()) :: t()
+  def install_type_aliases(%__MODULE__{} = context, type_aliases) do
+    Map.update!(context, :type_aliases, &Map.merge(&1, type_aliases))
   end
 
   @spec lookup_symbol(t(), name()) :: {:ok, SymbolInfo.t()} | :error
@@ -136,6 +150,17 @@ defmodule JetExp.Parser.Context do
   def lookup_macro(%__MODULE__{} = context, name) do
     with(:error <- Map.fetch(context.macros, name)) do
       lookup_macro(context.enclosing, name)
+    end
+  end
+
+  @spec lookup_type(t(), JetExp.Typing.Types.alias()) :: {:ok, JetExp.Typing.Types.t()} | :error
+  def lookup_type(%__MODULE__{enclosing: nil} = context, name) do
+    Map.fetch(context.type_aliases, name)
+  end
+
+  def lookup_type(%__MODULE__{} = context, name) do
+    with(:error <- Map.fetch(context.type_aliases, name)) do
+      lookup_type(context.enclosing, name)
     end
   end
 
