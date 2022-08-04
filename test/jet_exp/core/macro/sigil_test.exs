@@ -15,7 +15,7 @@ defmodule JetExp.Core.Macro.SigilTest do
     assert {:ok, [reason: :format]} ===
              "~d\"2020.01/20\""
              |> expand()
-             |> JetExp.Parser.Ast.extract_annotation(:errors)
+             |> JetExp.Parser.Ast.extract_meta(:errors)
   end
 
   defp expand(code) do

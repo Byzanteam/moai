@@ -22,7 +22,11 @@ defmodule JetExp.IntegrationTest do
       |> JetExp.Core.Macro.Sigil.BuiltIn.install()
 
     code = """
-    for d in ds -> date_diff_days(~d\"2020-01-01\", d)
+    for d in ds ->
+      date_diff_days(
+        ~d\"2020-01-01\",
+        d
+      )
     """
 
     assert {:ok, tokens} = JetExp.Tokenizer.tokenize(code)
@@ -36,7 +40,7 @@ defmodule JetExp.IntegrationTest do
         &JetExp.Typing.Annotator.annotator/2
       )
 
-    assert :error === JetExp.Parser.Ast.extract_annotation(aast, :errors)
+    assert :error === JetExp.Parser.Ast.extract_meta(aast, :errors)
 
     env =
       Env.new(%{

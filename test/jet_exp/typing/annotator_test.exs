@@ -29,7 +29,7 @@ defmodule JetExp.Typing.AnnotatorTest do
     end
 
     test "fails" do
-      assert {:error, reason: :not_exists, id: "myvar"} === extract_type("myvar")
+      assert {:error, line: 1, reason: :not_exists, id: "myvar"} === extract_type("myvar")
     end
   end
 
@@ -43,16 +43,16 @@ defmodule JetExp.Typing.AnnotatorTest do
     end
 
     test "fails on empty list" do
-      assert {:error, reason: :required, value: []} === extract_type("[]")
+      assert {:error, line: 1, reason: :required, value: []} === extract_type("[]")
     end
 
     test "fails when type slaps" do
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("[1, 2, a]", build_symbol_table(%{"a" => %{type: :string}}))
     end
 
     test "synthesize errors" do
-      assert {:error, reason: :not_exists, id: "a"} === extract_type("[1, 2, a]")
+      assert {:error, line: 1, reason: :not_exists, id: "a"} === extract_type("[1, 2, a]")
     end
   end
 
@@ -66,7 +66,7 @@ defmodule JetExp.Typing.AnnotatorTest do
     end
 
     test "fails on non-list source" do
-      assert {:error, reason: :type_slaps, expected_type: :"[a]"} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :"[a]"} ===
                extract_type(
                  "for x in xs -> x",
                  build_symbol_table(%{"xs" => %{type: :number}})
@@ -90,7 +90,7 @@ defmodule JetExp.Typing.AnnotatorTest do
     end
 
     test "fails on predicate type slaps" do
-      assert {:error, reason: :type_slaps, expected_type: :bool} ==
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :bool} ==
                extract_type(
                  "if(1, x, y)",
                  build_symbol_table(%{"x" => %{type: :dummy_type}, "y" => %{type: :dummy_type}})
@@ -98,7 +98,7 @@ defmodule JetExp.Typing.AnnotatorTest do
     end
 
     test "fails on type slaps" do
-      assert {:error, reason: :type_slaps, expected_type: :dummy_type1} ==
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :dummy_type1} ==
                extract_type(
                  "if(true, x, y)",
                  build_symbol_table(%{"x" => %{type: :dummy_type1}, "y" => %{type: :dummy_type2}})
@@ -131,7 +131,7 @@ defmodule JetExp.Typing.AnnotatorTest do
           "y" => %{type: :bool}
         })
 
-      assert {:error, reason: :not_exists, id: "dummy_fun"} ===
+      assert {:error, line: 1, reason: :not_exists, id: "dummy_fun"} ===
                extract_type("dummy_fun(x, y)", symbol_table)
 
       symbol_table =
@@ -147,7 +147,7 @@ defmodule JetExp.Typing.AnnotatorTest do
           }
         )
 
-      assert {:error, reason: :not_exists, id: "dummy_fun"} ===
+      assert {:error, line: 1, reason: :not_exists, id: "dummy_fun"} ===
                extract_type("dummy_fun(x, y)", symbol_table)
 
       symbol_table =
@@ -162,7 +162,7 @@ defmodule JetExp.Typing.AnnotatorTest do
           }
         )
 
-      assert {:error, reason: :not_exists, id: "dummy_fun"} ===
+      assert {:error, line: 1, reason: :not_exists, id: "dummy_fun"} ===
                extract_type("dummy_fun(x)", symbol_table)
     end
   end
@@ -207,7 +207,7 @@ defmodule JetExp.Typing.AnnotatorTest do
           }
         )
 
-      assert {:error, reason: :not_exists, id: "dummy_fun"} ===
+      assert {:error, line: 1, reason: :not_exists, id: "dummy_fun"} ===
                extract_type("dummy_fun(y, x)", symbol_table)
     end
   end
@@ -226,19 +226,19 @@ defmodule JetExp.Typing.AnnotatorTest do
     test "fails on type slaps" do
       symbol_table = build_symbol_table(%{"x" => %{type: :bool}, "y" => %{type: :number}})
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("x + y", symbol_table)
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("x - y", symbol_table)
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("x * y", symbol_table)
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("x / y", symbol_table)
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("-x", symbol_table)
     end
   end
@@ -255,13 +255,13 @@ defmodule JetExp.Typing.AnnotatorTest do
     test "fails on type slaps" do
       symbol_table = build_symbol_table(%{"x" => %{type: :number}, "y" => %{type: :bool}})
 
-      assert {:error, reason: :type_slaps, expected_type: :bool} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :bool} ===
                extract_type("x and y", symbol_table)
 
-      assert {:error, reason: :type_slaps, expected_type: :bool} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :bool} ===
                extract_type("x or y", symbol_table)
 
-      assert {:error, reason: :type_slaps, expected_type: :bool} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :bool} ===
                extract_type("not x", symbol_table)
     end
   end
@@ -279,16 +279,16 @@ defmodule JetExp.Typing.AnnotatorTest do
     test "fails on type slaps" do
       symbol_table = build_symbol_table(%{"x" => %{type: :number}, "y" => %{type: :string}})
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("x > y", symbol_table)
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("x < y", symbol_table)
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("x >= y", symbol_table)
 
-      assert {:error, reason: :type_slaps, expected_type: :number} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :number} ===
                extract_type("x <= y", symbol_table)
     end
   end
@@ -304,7 +304,7 @@ defmodule JetExp.Typing.AnnotatorTest do
     test "fails on type slaps" do
       symbol_table = build_symbol_table(%{"x" => %{type: :string}, "y" => %{type: :number}})
 
-      assert {:error, reason: :type_slaps, expected_type: :string} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :string} ===
                extract_type("x == y", symbol_table)
     end
   end
@@ -365,12 +365,12 @@ defmodule JetExp.Typing.AnnotatorTest do
     test "fails on type slaps" do
       symbol_table = build_symbol_table(%{"obj" => %{type: :number}})
 
-      assert {:error, reason: :type_slaps, expected_type: :%{}} ===
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :%{}} ===
                extract_type("obj.name", symbol_table)
 
       symbol_table = build_symbol_table(%{"obj" => %{type: %{"name" => :string}}})
 
-      assert {:error, reason: :key_not_found, keys: ["name"]} ===
+      assert {:error, line: 1, reason: :key_not_found, keys: ["name"]} ===
                extract_type("obj.age", symbol_table)
     end
   end

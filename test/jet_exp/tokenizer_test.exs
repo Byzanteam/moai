@@ -2,7 +2,8 @@ defmodule JetExp.TokenizerTest do
   use ExUnit.Case
 
   @code """
-  my_var my_var' MyVar1
+  my_var my_var' myVar
+  String
   nil
   true false
   10 01
@@ -23,7 +24,8 @@ defmodule JetExp.TokenizerTest do
               [
                 {:id, "my_var"},
                 {:id, "my_var'"},
-                {:id, "MyVar1"},
+                {:id, "myVar"},
+                {:namespace, "String"},
                 nil,
                 {:bool, true},
                 {:bool, false},

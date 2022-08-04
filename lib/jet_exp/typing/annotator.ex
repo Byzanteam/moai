@@ -18,13 +18,13 @@ defmodule JetExp.Typing.Annotator do
   def annotator(node, context) do
     case infer(node, context) do
       {:ok, type} ->
-        {Ast.annotate(node, type: type), context}
+        {Ast.update_meta(node, :type, type), context}
 
       {:ok, type, context} ->
-        {Ast.annotate(node, type: type), context}
+        {Ast.update_meta(node, :type, type), context}
 
       {:error, errors} ->
-        {Ast.annotate(node, errors: errors), context}
+        {Ast.update_meta(node, :errors, errors), context}
 
       :skip ->
         {node, context}
@@ -82,17 +82,19 @@ defmodule JetExp.Typing.Annotator do
         {:ok, SymbolInfo.extract(info, :type)}
 
       :error ->
-        {:error, reason: :not_exists, id: name}
+        {:error, line: Ast.extract_meta!(node, :line), reason: :not_exists, id: name}
     end
   end
 
   defp infer_list(node) do
     case Ast.list_args(node) do
       [] ->
-        {:error, reason: :required, value: []}
+        {:error, line: Ast.extract_meta!(node, :line), reason: :required, value: []}
 
       [elem | rest] ->
-        do_infer_list(elem, rest)
+        elem
+        |> do_infer_list(rest)
+        |> attach_error_line(node)
     end
   end
 
@@ -113,7 +115,9 @@ defmodule JetExp.Typing.Annotator do
         {:ok, type, context}
 
       {:ok, _type} ->
-        type_slaps(:"[a]")
+        :"[a]"
+        |> type_slaps()
+        |> attach_error_line(node)
 
       error ->
         error
@@ -132,15 +136,19 @@ defmodule JetExp.Typing.Annotator do
   end
 
   defp infer_conditional(node) do
-    case node |> Ast.conditional_predicate() |> extract_type() do
+    predicate = Ast.conditional_predicate(node)
+
+    case extract_type(predicate) do
       {:ok, :bool} ->
-        do_infer_conditional(
-          Ast.conditional_consequent(node),
-          Ast.conditional_alternative(node)
-        )
+        node
+        |> Ast.conditional_consequent()
+        |> do_infer_conditional(Ast.conditional_alternative(node))
+        |> attach_error_line(node)
 
       {:ok, _type} ->
-        type_slaps(:bool)
+        :bool
+        |> type_slaps()
+        |> attach_error_line(node)
 
       error ->
         error
@@ -161,7 +169,8 @@ defmodule JetExp.Typing.Annotator do
   end
 
   defp infer_call(node, context) do
-    fun_name = node |> Ast.call_id() |> Ast.id_name()
+    call_id = Ast.call_id(node)
+    fun_name = Ast.id_name(call_id)
     args = Ast.call_args(node)
 
     context
@@ -172,6 +181,7 @@ defmodule JetExp.Typing.Annotator do
       |> elem(1)
     end)
     |> do_infer_call(fun_name, args)
+    |> attach_error_line(call_id)
   end
 
   defp select_fun(symbol_info, args) do
@@ -220,6 +230,7 @@ defmodule JetExp.Typing.Annotator do
     node
     |> Ast.op_operands()
     |> check_homogeneous(expected_type, final_type)
+    |> attach_error_line(node)
   end
 
   defp infer_comp_op(node) do
@@ -230,6 +241,9 @@ defmodule JetExp.Typing.Annotator do
       :ok <- has_type?(right, type)
     ) do
       {:ok, :bool}
+    else
+      error ->
+        attach_error_line(error, node)
     end
   end
 
@@ -238,10 +252,14 @@ defmodule JetExp.Typing.Annotator do
 
     case extract_type_expand_alias(source_expr, context) do
       {:ok, %{} = type} ->
-        do_infer_access_op(type, Ast.id_name(accessor))
+        type
+        |> do_infer_access_op(Ast.id_name(accessor))
+        |> attach_error_line(accessor)
 
       {:ok, _type} ->
-        type_slaps(:%{})
+        :%{}
+        |> type_slaps()
+        |> attach_error_line(node)
 
       error ->
         error
@@ -282,6 +300,12 @@ defmodule JetExp.Typing.Annotator do
     {:error, reason: :type_slaps, expected_type: expected_type}
   end
 
+  defp attach_error_line({:error, errors}, node) do
+    {:error, Keyword.put_new_lazy(errors, :line, fn -> Ast.extract_meta!(node, :line) end)}
+  end
+
+  defp attach_error_line(result, _node), do: result
+
   @spec extract_type(Ast.t() | Ast.list_comp_node_binding()) ::
           {:ok, Types.t() | Types.alias()} | {:error, errors()}
   def extract_type(node) do
@@ -302,9 +326,8 @@ defmodule JetExp.Typing.Annotator do
         extract_object_type(node)
 
       true ->
-        with(:error <- Ast.extract_annotation(node, :type)) do
-          {:ok, errors} = Ast.extract_annotation(node, :errors)
-          {:error, errors}
+        with(:error <- Ast.extract_meta(node, :type)) do
+          {:error, Ast.extract_meta!(node, :errors)}
         end
     end
   end

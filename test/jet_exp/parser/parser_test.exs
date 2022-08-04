@@ -5,7 +5,7 @@ defmodule JetExp.ParserTest do
 
   describe "expr" do
     test "id" do
-      assert {:ok, {:id, "my_var"}} === parse("my_var")
+      assert {:ok, {:id, [line: 1], "my_var"}} === parse("my_var")
     end
 
     test "nil" do
@@ -28,52 +28,56 @@ defmodule JetExp.ParserTest do
     end
 
     test "sigil" do
-      assert {:ok, {:sigil, ["d", "2022-01-01"]}} === parse("~d\"2022-01-01\"")
+      assert {:ok, {:sigil, [line: 1], ["d", "2022-01-01"]}} === parse("~d\"2022-01-01\"")
     end
 
     test "list" do
-      assert {:ok, {:"[]", [1, 2, 3]}} === parse("[1, 2, 3]")
+      assert {:ok, {:"[]", [line: 1], [1, 2, 3]}} === parse("[1, 2, 3]")
     end
 
     test "op_expr" do
-      assert {:ok, {:+, [{:id, "score"}, 3.0]}} === parse("score + 3.0")
+      assert {:ok, {:+, [line: 1], [{:id, [line: 1], "score"}, 3.0]}} === parse("score + 3.0")
     end
 
     test "call" do
-      assert {:ok, {{:id, "avg"}, [{:id, "score1"}, {:id, "score2"}]}} ===
+      assert {:ok,
+              {{:id, [line: 1], "avg"}, [line: 1],
+               [{:id, [line: 1], "score1"}, {:id, [line: 1], "score2"}]}} ===
                parse("avg(score1, score2)")
     end
 
     test "list_comp" do
       assert {:ok,
-              {:for,
+              {:for, [line: 1],
                [
-                 {:in, [{:id, "s"}, {:id, "s_list"}]},
-                 {{:id, "concat"}, [{:id, "s"}, {:id, "suffix"}]}
+                 {:in, [line: 1], [{:id, [line: 1], "s"}, {:id, [line: 1], "s_list"}]},
+                 {{:id, [line: 1], "concat"}, [line: 1],
+                  [{:id, [line: 1], "s"}, {:id, [line: 1], "suffix"}]}
                ]}} ===
                parse("for s in s_list -> concat(s, suffix)")
     end
 
     test "group" do
-      assert {:ok, {:*, [{:+, [1, 2]}, 3]}} ===
+      assert {:ok, {:*, [line: 1], [{:+, [line: 1], [1, 2]}, 3]}} ===
                parse("(1 + 2) * 3")
 
-      assert {:ok, {:-, [10, {:-, [3, 4]}]}} ===
+      assert {:ok, {:-, [line: 1], [10, {:-, [line: 1], [3, 4]}]}} ===
                parse("10 - (3 - 4)")
     end
   end
 
   describe "list" do
     test "empty" do
-      assert {:ok, {:"[]", []}} === parse("[]")
+      assert {:ok, {:"[]", [line: 1], []}} === parse("[]")
     end
 
     test "recursion on expr" do
       assert {:ok,
-              {:"[]",
+              {:"[]", [line: 1],
                [
                  1,
-                 {{:id, "avg"}, [{:id, "score1"}, {:id, "score2"}]},
+                 {{:id, [line: 1], "avg"}, [line: 1],
+                  [{:id, [line: 1], "score1"}, {:id, [line: 1], "score2"}]},
                  3
                ]}} === parse("[1, avg(score1, score2), 3]")
     end
@@ -81,8 +85,11 @@ defmodule JetExp.ParserTest do
 
   describe "operation" do
     test "logical" do
-      assert {:ok, {:or, [{:id, "a"}, {:id, "b"}]}} === parse("a or b")
-      assert {:ok, {:and, [{:id, "a"}, {:id, "b"}]}} === parse("a and b")
+      assert {:ok, {:or, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a or b")
+
+      assert {:ok, {:and, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a and b")
 
       # associativity
       assert parse("a or b or c") === parse("(a or b) or c")
@@ -92,22 +99,39 @@ defmodule JetExp.ParserTest do
     end
 
     test "comparison" do
-      assert {:ok, {:==, [{:id, "a"}, {:id, "b"}]}} === parse("a == b")
-      assert {:ok, {:!=, [{:id, "a"}, {:id, "b"}]}} === parse("a != b")
+      assert {:ok, {:==, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a == b")
+
+      assert {:ok, {:!=, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a != b")
     end
 
     test "relation" do
-      assert {:ok, {:>, [{:id, "a"}, {:id, "b"}]}} === parse("a > b")
-      assert {:ok, {:>=, [{:id, "a"}, {:id, "b"}]}} === parse("a >= b")
-      assert {:ok, {:<, [{:id, "a"}, {:id, "b"}]}} === parse("a < b")
-      assert {:ok, {:<=, [{:id, "a"}, {:id, "b"}]}} === parse("a <= b")
+      assert {:ok, {:>, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a > b")
+
+      assert {:ok, {:>=, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a >= b")
+
+      assert {:ok, {:<, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a < b")
+
+      assert {:ok, {:<=, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a <= b")
     end
 
     test "arithmetic" do
-      assert {:ok, {:+, [{:id, "a"}, {:id, "b"}]}} === parse("a + b")
-      assert {:ok, {:-, [{:id, "a"}, {:id, "b"}]}} === parse("a - b")
-      assert {:ok, {:*, [{:id, "a"}, {:id, "b"}]}} === parse("a * b")
-      assert {:ok, {:/, [{:id, "a"}, {:id, "b"}]}} === parse("a / b")
+      assert {:ok, {:+, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a + b")
+
+      assert {:ok, {:-, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a - b")
+
+      assert {:ok, {:*, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a * b")
+
+      assert {:ok, {:/, [line: 1], [{:id, [line: 1], "a"}, {:id, [line: 1], "b"}]}} ===
+               parse("a / b")
 
       # associativity
       assert parse("a + b + c") === parse("(a + b) + c")
@@ -128,10 +152,10 @@ defmodule JetExp.ParserTest do
     end
 
     test "unary" do
-      assert {:ok, {:not, [{:id, "a"}]}} === parse("not a")
+      assert {:ok, {:not, [line: 1], [{:id, [line: 1], "a"}]}} === parse("not a")
 
-      assert {:ok, {:id, "a"}} === parse("+a")
-      assert {:ok, {:-, [{:id, "a"}]}} === parse("-a")
+      assert {:ok, {:id, [line: 1], "a"}} === parse("+a")
+      assert {:ok, {:-, [line: 1], [{:id, [line: 1], "a"}]}} === parse("-a")
 
       assert {:ok, 1} === parse("+1")
       assert {:ok, -1} === parse("-1")
@@ -140,7 +164,8 @@ defmodule JetExp.ParserTest do
     end
 
     test "dot" do
-      assert {:ok, {:., [{:id, "checkbox"}, {:id, "options"}]}} === parse("checkbox.options")
+      assert {:ok, {:., [line: 1], [{:id, [line: 1], "checkbox"}, {:id, [line: 1], "options"}]}} ===
+               parse("checkbox.options")
     end
 
     test "precedence" do
@@ -154,27 +179,40 @@ defmodule JetExp.ParserTest do
 
   describe "call" do
     test "0 args" do
-      assert {:ok, {{:id, "fun"}, []}} === parse("fun()")
+      assert {:ok, {{:id, [line: 1], "fun"}, [line: 1], []}} === parse("fun()")
     end
 
     test "recursion on expr" do
       assert {:ok,
-              {{:id, "avg"},
+              {{:id, [line: 1], "avg"}, [line: 1],
                [
-                 {:for, [{:in, [{:id, "n"}, {:id, "nums"}]}, {:+, [{:id, "n"}, 1]}]},
-                 {:+, [{:id, "num1"}, {:id, "num2"}]}
+                 {:for, [line: 1],
+                  [
+                    {:in, [line: 1], [{:id, [line: 1], "n"}, {:id, [line: 1], "nums"}]},
+                    {:+, [line: 1], [{:id, [line: 1], "n"}, 1]}
+                  ]},
+                 {:+, [line: 1], [{:id, [line: 1], "num1"}, {:id, [line: 1], "num2"}]}
                ]}} ===
                parse("avg(for n in nums -> n + 1, num1 + num2)")
+    end
+
+    test "with namespace" do
+      assert {:ok, {{:id, [line: 1], "fun"}, [context: "Ns", line: 1], [1]}} ===
+               parse("Ns.fun(1)")
     end
   end
 
   describe "list_comp" do
     test "recursion on expr" do
       assert {:ok,
-              {:for,
+              {:for, [line: 1],
                [
-                 {:in, [{:id, "i"}, {{:id, "running_sum"}, [{:id, "sales"}]}]},
-                 {:*, [{:id, "i"}, 0.8]}
+                 {:in, [line: 1],
+                  [
+                    {:id, [line: 1], "i"},
+                    {{:id, [line: 1], "running_sum"}, [line: 1], [{:id, [line: 1], "sales"}]}
+                  ]},
+                 {:*, [line: 1], [{:id, [line: 1], "i"}, 0.8]}
                ]}} ===
                parse("for i in running_sum(sales) -> i * 0.8")
     end

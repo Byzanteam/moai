@@ -1,6 +1,7 @@
 Definitions.
 
-ID = [a-zA-Z][0-9a-zA-Z_']*
+ID = [a-z][0-9a-zA-Z_']*
+NAMESPACE = [A-Z][a-zA-Z]*
 
 INT = [0-9]+
 FLOAT = [0-9]+\.[0-9]+
@@ -30,6 +31,7 @@ false : {token, {bool, TokenLine, false}}.
 {STRING} : {token, {string, TokenLine, build_string(TokenChars)}}.
 
 {ID} : {token, {id, TokenLine, list_to_binary(TokenChars)}}.
+{NAMESPACE} : {token, {namespace, TokenLine, list_to_binary(TokenChars)}}.
 
 ~{ID} : {token, {sigil, TokenLine, build_sigil(TokenChars)}}.
 

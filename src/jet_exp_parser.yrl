@@ -5,7 +5,7 @@ Nonterminals
   .
 
 Terminals
-  id nil bool number string sigil
+  id namespace nil bool number string sigil
   for in '->' and or not
   ',' '(' ')' '[' ']' '.' '+' '-' '*' '/' '==' '!=' '>' '<' '>=' '<='
   .
@@ -42,23 +42,24 @@ group -> '(' expr ')' : '$2'.
 comma_sep_list -> expr : ['$1'].
 comma_sep_list -> comma_sep_list ',' expr : ['$3' | '$1'].
 
-list -> '[' ']' : {'[]', []}.
-list -> '[' comma_sep_list ']' : {'[]', lists:reverse('$2')}.
+list -> '[' ']' : attach_line({'[]', []}, '$1').
+list -> '[' comma_sep_list ']' : attach_line({'[]', lists:reverse('$2')}, '$1').
 
-list_comp -> 'for' id 'in' expr '->' expr : build_list_comp(build_id('$2'), '$4', '$6').
+list_comp -> 'for' id 'in' expr '->' expr : attach_line(build_list_comp(build_id('$2'), '$4', '$3', '$6'), '$1').
 
-call -> id call_args_parens : {build_id('$1'), '$2'}.
+call -> namespace dot_op call : attach_namespace_to_call('$3', '$1').
+call -> id call_args_parens : attach_line({build_id('$1'), '$2'}, '$1').
 call_args_parens -> '(' ')' : [].
 call_args_parens -> '(' comma_sep_list ')' : lists:reverse('$2').
 
-operation -> expr or_op expr : {build_op('$2'), ['$1', '$3']}.
-operation -> expr and_op expr : {build_op('$2'), ['$1', '$3']}.
-operation -> expr comp_op expr : {build_op('$2'), ['$1', '$3']}.
-operation -> expr rel_op expr : {build_op('$2'), ['$1', '$3']}.
-operation -> expr add_op expr : {build_op('$2'), ['$1', '$3']}.
-operation -> expr mult_op expr : {build_op('$2'), ['$1', '$3']}.
-operation -> unary_op expr : build_unary_op_expr(build_op('$1'), '$2').
-operation -> expr dot_op id : {build_op('$2'), ['$1', build_id('$3')]}.
+operation -> expr or_op expr : build_op('$2', ['$1', '$3']).
+operation -> expr and_op expr : build_op('$2', ['$1', '$3']).
+operation -> expr comp_op expr : build_op('$2', ['$1', '$3']).
+operation -> expr rel_op expr : build_op('$2', ['$1', '$3']).
+operation -> expr add_op expr : build_op('$2', ['$1', '$3']).
+operation -> expr mult_op expr : build_op('$2', ['$1', '$3']).
+operation -> unary_op expr : attach_line(build_unary_op_expr(extract_op('$1'), '$2'), '$1').
+operation -> expr dot_op id : build_op('$2', ['$1', build_id('$3')]).
 
 or_op -> 'or' : '$1'.
 and_op -> 'and' : '$1'.
@@ -85,15 +86,20 @@ dot_op -> '.' : '$1'.
 
 Erlang code.
 
-build_id({id, _TokenLine, Name}) -> {id, Name}.
+build_id({id, TokenLine, Name}) -> {id, [{line, TokenLine}], Name}.
 
 build_nil() -> nil.
 
 build_literal({_Category, _TokenLine, Value}) -> Value.
 
-build_sigil({sigil, _TokenLine, Sigil}, Value) -> {sigil, [Sigil, Value]}.
+build_sigil({sigil, TokenLine, Sigil}, Value) -> {sigil, [{line, TokenLine}], [Sigil, Value]}.
 
-build_op({Op, _TokenLine}) -> Op.
+attach_namespace_to_call({CallId, Meta, CallArgs}, {namespace, _TokenLine, Namespace}) ->
+  {CallId, [{context, Namespace} | Meta], CallArgs}.
+
+build_op({Op, TokenLine}, Args) -> {Op, [{line, TokenLine}], Args}.
+
+extract_op({Op, _TokenLine}) -> Op.
 
 build_unary_op_expr('+', Term) -> Term;
 build_unary_op_expr('-', Number) when is_number(Number) -> -Number;
@@ -101,4 +107,10 @@ build_unary_op_expr('-', Id) -> {'-', [Id]};
 build_unary_op_expr('not', Bool) when is_boolean(Bool) -> not Bool;
 build_unary_op_expr('not', Id) -> {'not', [Id]}.
 
-build_list_comp(Bind, SourceExpr, TargetExpr) -> {for, [{in, [Bind, SourceExpr]}, TargetExpr]}.
+build_list_comp(Bind, SourceExpr, In, TargetExpr) -> {for, [attach_line({in, [Bind, SourceExpr]}, In), TargetExpr]}.
+
+attach_line({Form, Args}, {_Category, TokenLine}) ->
+  {Form, [{line, TokenLine}], Args};
+attach_line({Form, Args}, {_Category, TokenLine, _Value}) ->
+  {Form, [{line, TokenLine}], Args};
+attach_line(Node, _Token) -> Node.
