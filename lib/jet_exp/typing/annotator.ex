@@ -40,7 +40,7 @@ defmodule JetExp.Typing.Annotator do
         infer_id(node, context)
 
       Ast.list?(node) ->
-        infer_list(node)
+        infer_list(node, context)
 
       Ast.list_comp_binding?(node) ->
         perform_list_comp_binding(node, context)
@@ -49,22 +49,22 @@ defmodule JetExp.Typing.Annotator do
         infer_list_comp(node, context)
 
       Ast.conditional?(node) ->
-        infer_conditional(node)
+        infer_conditional(node, context)
 
       Ast.call?(node) ->
         infer_call(node, context)
 
       Ast.arith_op?(node) ->
-        infer_op(node, :number, :number)
+        infer_op(node, :number, :number, context)
 
       Ast.logic_op?(node) ->
-        infer_op(node, :bool, :bool)
+        infer_op(node, :bool, :bool, context)
 
       Ast.rel_op?(node) ->
-        infer_op(node, :number, :bool)
+        infer_op(node, :number, :bool, context)
 
       Ast.comp_op?(node) ->
-        infer_comp_op(node)
+        infer_comp_op(node, context)
 
       Ast.access_op?(node) ->
         infer_access_op(node, context)
@@ -81,33 +81,33 @@ defmodule JetExp.Typing.Annotator do
       {:ok, info} when not is_list(info) ->
         {:ok, SymbolInfo.extract(info, :type)}
 
-      :error ->
+      _error ->
         {:error, line: Ast.extract_meta!(node, :line), reason: :not_exists, id: name}
     end
   end
 
-  defp infer_list(node) do
+  defp infer_list(node, context) do
     case Ast.list_args(node) do
       [] ->
         {:error, line: Ast.extract_meta!(node, :line), reason: :required, value: []}
 
       [elem | rest] ->
         elem
-        |> do_infer_list(rest)
+        |> do_infer_list(rest, context)
         |> attach_error_line(node)
     end
   end
 
-  defp do_infer_list(elem, rest) do
+  defp do_infer_list(elem, rest, context) do
     with({:ok, type} <- extract_type(elem)) do
-      check_homogeneous(rest, type, [type])
+      check_homogeneous(rest, type, [type], context)
     end
   end
 
   defp perform_list_comp_binding(node, context) do
     [var, source_expr] = Ast.list_comp_binding_args(node)
 
-    case extract_type(source_expr) do
+    case extract_type_expand_alias(source_expr, context) do
       {:ok, [type]} ->
         context =
           Context.new(context, symbols: %{Ast.id_name(var) => SymbolInfo.new(%{type: type})})
@@ -135,14 +135,14 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
-  defp infer_conditional(node) do
+  defp infer_conditional(node, context) do
     predicate = Ast.conditional_predicate(node)
 
-    case extract_type(predicate) do
+    case extract_type_expand_alias(predicate, context) do
       {:ok, :bool} ->
         node
         |> Ast.conditional_consequent()
-        |> do_infer_conditional(Ast.conditional_alternative(node))
+        |> do_infer_conditional(Ast.conditional_alternative(node), context)
         |> attach_error_line(node)
 
       {:ok, _type} ->
@@ -155,14 +155,14 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
-  defp do_infer_conditional(consequent, :error) do
+  defp do_infer_conditional(consequent, :error, _context) do
     extract_type(consequent)
   end
 
-  defp do_infer_conditional(consequent, {:ok, alternative}) do
+  defp do_infer_conditional(consequent, {:ok, alternative}, context) do
     with(
       {:ok, type} <- extract_type(consequent),
-      :ok <- has_type?(alternative, type)
+      :ok <- has_type?(alternative, type, context)
     ) do
       {:ok, type}
     end
@@ -180,7 +180,7 @@ defmodule JetExp.Typing.Annotator do
       |> SymbolInfo.extract(:type)
       |> elem(1)
     end)
-    |> do_infer_call(fun_name, args)
+    |> do_infer_call(fun_name, args, context)
     |> attach_error_line(call_id)
   end
 
@@ -196,49 +196,53 @@ defmodule JetExp.Typing.Annotator do
     end
   end
 
-  defp do_infer_call([], fun_name, _args) do
+  defp do_infer_call([], fun_name, _args, _context) do
     {:error, reason: :not_exists, id: fun_name}
   end
 
-  defp do_infer_call([[ret_type]], _fun_name, []) do
+  defp do_infer_call([[ret_type]], _fun_name, [], _context) do
     {:ok, ret_type}
   end
 
-  defp do_infer_call(_funs, fun_name, []) do
+  defp do_infer_call(_funs, fun_name, [], _context) do
     {:error, reason: :not_exists, id: fun_name}
   end
 
-  defp do_infer_call(funs, fun_name, [arg | args]) do
+  defp do_infer_call(funs, fun_name, [arg | args], context) do
     with({:ok, arg_type} <- extract_type(arg)) do
       funs
-      |> narrow_funs(arg_type)
-      |> do_infer_call(fun_name, args)
+      |> narrow_funs(arg_type, context)
+      |> do_infer_call(fun_name, args, context)
     end
   end
 
-  defp narrow_funs(funs, arg_type) do
+  defp narrow_funs(funs, expected_arg_type, context) do
     List.foldl(funs, [], fn
-      [^arg_type | arg_and_ret_types], acc ->
-        [arg_and_ret_types | acc]
+      [arg_type | arg_and_ret_types], acc ->
+        if type_equal?(expected_arg_type, arg_type, context) do
+          [arg_and_ret_types | acc]
+        else
+          acc
+        end
 
       _fun_type, acc ->
         acc
     end)
   end
 
-  defp infer_op(node, expected_type, final_type) do
+  defp infer_op(node, expected_type, final_type, context) do
     node
     |> Ast.op_operands()
-    |> check_homogeneous(expected_type, final_type)
+    |> check_homogeneous(expected_type, final_type, context)
     |> attach_error_line(node)
   end
 
-  defp infer_comp_op(node) do
+  defp infer_comp_op(node, context) do
     [left, right] = Ast.op_operands(node)
 
     with(
       {:ok, type} <- extract_type(left),
-      :ok <- has_type?(right, type)
+      :ok <- has_type?(right, type, context)
     ) do
       {:ok, :bool}
     else
@@ -275,36 +279,47 @@ defmodule JetExp.Typing.Annotator do
     {:error, reason: :key_not_found, keys: Map.keys(object_type)}
   end
 
-  defp has_type?(node, type) do
-    case extract_type(node) do
-      {:ok, ^type} ->
-        :ok
+  defguardp is_type_alias(type_or_alias) when is_binary(type_or_alias)
 
-      {:ok, _type} ->
-        type_slaps(type)
-
-      error ->
-        error
+  defp has_type?(node, expected_type, context) do
+    with(
+      {:ok, type} <- extract_type(node),
+      true <- type_equal?(expected_type, type, context)
+    ) do
+      :ok
+    else
+      false -> type_slaps(expected_type)
+      error -> error
     end
   end
 
-  defp check_homogeneous(nodes, expected_type, final_type) do
+  defp type_equal?(type, type, _context), do: true
+
+  defp type_equal?(typea, typeb, _context)
+       when not is_type_alias(typea) and not is_type_alias(typeb) do
+    false
+  end
+
+  defp type_equal?(typea, typeb, context) do
+    resolve_type_alias(typea, context) === resolve_type_alias(typeb, context)
+  end
+
+  defp resolve_type_alias(type_alias, context) when is_type_alias(type_alias) do
+    {:ok, type} = Context.lookup_type(context, type_alias)
+    type
+  end
+
+  defp resolve_type_alias(type, _context) do
+    type
+  end
+
+  defp check_homogeneous(nodes, expected_type, final_type, context) do
     Enum.find_value(nodes, {:ok, final_type}, fn node ->
-      with(:ok <- has_type?(node, expected_type)) do
+      with(:ok <- has_type?(node, expected_type, context)) do
         false
       end
     end)
   end
-
-  def type_slaps(expected_type) do
-    {:error, reason: :type_slaps, expected_type: expected_type}
-  end
-
-  defp attach_error_line({:error, errors}, node) do
-    {:error, Keyword.put_new_lazy(errors, :line, fn -> Ast.extract_meta!(node, :line) end)}
-  end
-
-  defp attach_error_line(result, _node), do: result
 
   @spec extract_type(Ast.t() | Ast.list_comp_node_binding()) ::
           {:ok, Types.t() | Types.alias()} | {:error, errors()}
@@ -333,7 +348,7 @@ defmodule JetExp.Typing.Annotator do
   end
 
   defp extract_type_expand_alias(node, context) do
-    with({:ok, type_alias} when is_binary(type_alias) <- extract_type(node)) do
+    with({:ok, type_alias} when is_type_alias(type_alias) <- extract_type(node)) do
       {:ok, _type} = Context.lookup_type(context, type_alias)
     end
   end
@@ -349,4 +364,14 @@ defmodule JetExp.Typing.Annotator do
       end
     end)
   end
+
+  def type_slaps(expected_type) do
+    {:error, reason: :type_slaps, expected_type: expected_type}
+  end
+
+  defp attach_error_line({:error, errors}, node) do
+    {:error, Keyword.put_new_lazy(errors, :line, fn -> Ast.extract_meta!(node, :line) end)}
+  end
+
+  defp attach_error_line(result, _node), do: result
 end
