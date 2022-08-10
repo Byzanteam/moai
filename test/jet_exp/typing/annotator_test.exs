@@ -115,13 +115,15 @@ defmodule JetExp.Typing.AnnotatorTest do
             "y" => %{type: :bool}
           },
           %{
-            "dummy_fun" => %{
-              type: {:fun, [:number, :bool, :dummy_type]}
+            "DummyNamespace" => %{
+              "dummy_fun" => %{
+                type: {:fun, [:number, :bool, :dummy_type]}
+              }
             }
           }
         )
 
-      assert {:ok, :dummy_type} === extract_type("dummy_fun(x, y)", symbol_table)
+      assert {:ok, :dummy_type} === extract_type("DummyNamespace.dummy_fun(x, y)", symbol_table)
     end
 
     test "fails when fun not exists" do
@@ -132,7 +134,7 @@ defmodule JetExp.Typing.AnnotatorTest do
         })
 
       assert {:error, line: 1, reason: :not_exists, id: "dummy_fun"} ===
-               extract_type("dummy_fun(x, y)", symbol_table)
+               extract_type("DummyNamespace.dummy_fun(x, y)", symbol_table)
 
       symbol_table =
         build_symbol_table(
@@ -141,14 +143,16 @@ defmodule JetExp.Typing.AnnotatorTest do
             "y" => %{type: :bool}
           },
           %{
-            "dummy_fun" => %{
-              type: {:fun, [:number, :bool, :dummy_type]}
+            "DummyNamespace" => %{
+              "dummy_fun" => %{
+                type: {:fun, [:number, :bool, :dummy_type]}
+              }
             }
           }
         )
 
       assert {:error, line: 1, reason: :not_exists, id: "dummy_fun"} ===
-               extract_type("dummy_fun(x, y)", symbol_table)
+               extract_type("DummyNamespace.dummy_fun(x, y)", symbol_table)
 
       symbol_table =
         build_symbol_table(
@@ -156,8 +160,10 @@ defmodule JetExp.Typing.AnnotatorTest do
             "x" => %{type: :number}
           },
           %{
-            "dummy_fun" => %{
-              type: {:fun, [:number, :bool, :dummy_type]}
+            "DummyNamespace" => %{
+              "dummy_fun" => %{
+                type: {:fun, [:number, :bool, :dummy_type]}
+              }
             }
           }
         )
@@ -177,17 +183,19 @@ defmodule JetExp.Typing.AnnotatorTest do
             "z" => %{type: :string}
           },
           %{
-            "dummy_fun" => [
-              %{type: {:fun, [:number, :number]}},
-              %{type: {:fun, [:number, :number, :bool]}},
-              %{type: {:fun, [:number, :string, :string]}}
-            ]
+            "DummyNamespace" => %{
+              "dummy_fun" => [
+                %{type: {:fun, [:number, :number]}},
+                %{type: {:fun, [:number, :number, :bool]}},
+                %{type: {:fun, [:number, :string, :string]}}
+              ]
+            }
           }
         )
 
-      assert {:ok, :number} === extract_type("dummy_fun(x)", symbol_table)
-      assert {:ok, :bool} === extract_type("dummy_fun(x, y)", symbol_table)
-      assert {:ok, :string} === extract_type("dummy_fun(x, z)", symbol_table)
+      assert {:ok, :number} === extract_type("DummyNamespace.dummy_fun(x)", symbol_table)
+      assert {:ok, :bool} === extract_type("DummyNamespace.dummy_fun(x, y)", symbol_table)
+      assert {:ok, :string} === extract_type("DummyNamespace.dummy_fun(x, z)", symbol_table)
     end
 
     test "fails" do
@@ -198,17 +206,19 @@ defmodule JetExp.Typing.AnnotatorTest do
             "y" => %{type: :string}
           },
           %{
-            "dummy_fun" => [
-              %{type: {:fun, [:number, :number]}},
-              %{type: {:fun, [:number, :number, :bool]}},
-              %{type: {:fun, [:number, :string, :string]}},
-              %{type: {:fun, {:number, :number}}}
-            ]
+            "DummyNamespace" => %{
+              "dummy_fun" => [
+                %{type: {:fun, [:number, :number]}},
+                %{type: {:fun, [:number, :number, :bool]}},
+                %{type: {:fun, [:number, :string, :string]}},
+                %{type: {:fun, {:number, :number}}}
+              ]
+            }
           }
         )
 
       assert {:error, line: 1, reason: :not_exists, id: "dummy_fun"} ===
-               extract_type("dummy_fun(y, x)", symbol_table)
+               extract_type("DummyNamespace.dummy_fun(y, x)", symbol_table)
     end
   end
 
@@ -326,20 +336,22 @@ defmodule JetExp.Typing.AnnotatorTest do
 
       symbol_table =
         build_symbol_table(%{}, %{
-          "fun" => %{
-            type:
-              {:fun,
-               [
-                 %{
-                   "name" => :string,
-                   "age" => :number
-                 }
-               ]}
+          "DummyNamespace" => %{
+            "fun" => %{
+              type:
+                {:fun,
+                 [
+                   %{
+                     "name" => :string,
+                     "age" => :number
+                   }
+                 ]}
+            }
           }
         })
 
-      assert {:ok, :string} === extract_type("fun().name", symbol_table)
-      assert {:ok, :number} === extract_type("fun().age", symbol_table)
+      assert {:ok, :string} === extract_type("DummyNamespace.fun().name", symbol_table)
+      assert {:ok, :number} === extract_type("DummyNamespace.fun().age", symbol_table)
     end
 
     test "works with type aliases" do
@@ -349,7 +361,9 @@ defmodule JetExp.Typing.AnnotatorTest do
         [
           symbols: %{"obj" => Context.SymbolInfo.new(%{type: "dummy_obj"})},
           functions: %{
-            "fun" => [Context.SymbolInfo.new(%{type: {:fun, ["dummy_obj"]}})]
+            "DummyNamespace" => %{
+              "fun" => [Context.SymbolInfo.new(%{type: {:fun, ["dummy_obj"]}})]
+            }
           }
         ]
         |> Context.new()
@@ -358,8 +372,8 @@ defmodule JetExp.Typing.AnnotatorTest do
       assert {:ok, :string} === extract_type("obj.name", symbol_table)
       assert {:ok, :number} === extract_type("obj.age", symbol_table)
 
-      assert {:ok, :string} === extract_type("fun().name", symbol_table)
-      assert {:ok, :number} === extract_type("fun().age", symbol_table)
+      assert {:ok, :string} === extract_type("DummyNamespace.fun().name", symbol_table)
+      assert {:ok, :number} === extract_type("DummyNamespace.fun().age", symbol_table)
     end
 
     test "fails on type slaps" do
@@ -392,12 +406,15 @@ defmodule JetExp.Typing.AnnotatorTest do
       end)
 
     functions =
-      Map.new(functions, fn
-        {name, [_ | _] = infos} ->
-          {name, Enum.map(infos, &JetExp.Parser.Context.SymbolInfo.new/1)}
+      Map.new(functions, fn {namespace, functions} ->
+        {namespace,
+         Map.new(functions, fn
+           {name, [_ | _] = infos} ->
+             {name, Enum.map(infos, &JetExp.Parser.Context.SymbolInfo.new/1)}
 
-        {name, info} ->
-          {name, [JetExp.Parser.Context.SymbolInfo.new(info)]}
+           {name, info} ->
+             {name, [JetExp.Parser.Context.SymbolInfo.new(info)]}
+         end)}
       end)
 
     JetExp.Parser.Context.new(symbols: symbols, functions: functions)

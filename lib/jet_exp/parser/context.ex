@@ -28,9 +28,10 @@ defmodule JetExp.Parser.Context do
   end
 
   @typep name() :: String.t()
+  @typep namespace() :: String.t() | nil
 
   @typep symbols() :: %{required(name()) => SymbolInfo.t()}
-  @typep functions() :: %{required(name()) => [SymbolInfo.t(), ...]}
+  @typep functions() :: %{required(namespace()) => %{required(name()) => [SymbolInfo.t(), ...]}}
   @typep macros() :: %{required(name()) => JetExp.Core.Macro.t()}
 
   @type type_aliases() :: %{required(JetExp.Typing.Types.alias()) => JetExp.Typing.Types.t()}
@@ -76,20 +77,8 @@ defmodule JetExp.Parser.Context do
     Map.update!(
       context,
       :functions,
-      &Map.merge(&1, functions, fn _key, values1, values2 ->
-        insert_new_functions(values1, values2)
-      end)
+      &Map.merge(&1, functions)
     )
-  end
-
-  defp insert_new_functions(functions1, functions2) do
-    Enum.reduce(functions2, functions1, fn function, acc ->
-      if Enum.member?(acc, function) do
-        acc
-      else
-        [function | acc]
-      end
-    end)
   end
 
   @spec install_macros(t(), macros()) :: t()
@@ -113,32 +102,36 @@ defmodule JetExp.Parser.Context do
     end
   end
 
-  @spec lookup_functions(t(), name(), predicate :: (SymbolInfo.t() -> boolean())) ::
+  @spec lookup_functions(t(), namespace(), name(), predicate :: (SymbolInfo.t() -> boolean())) ::
           [SymbolInfo.t()]
-  def lookup_functions(%__MODULE__{enclosing: nil} = context, name, predicate) do
-    case Map.fetch(context.functions, name) do
-      {:ok, functions} ->
-        Enum.filter(functions, predicate)
-
-      :error ->
-        []
+  def lookup_functions(%__MODULE__{enclosing: nil} = context, namespace, name, predicate) do
+    with(
+      {:ok, functions} <- Map.fetch(context.functions, namespace),
+      {:ok, functions} <- Map.fetch(functions, name)
+    ) do
+      Enum.filter(functions, predicate)
+    else
+      :error -> []
     end
   end
 
-  def lookup_functions(context, name, predicate) do
-    case Map.fetch(context.functions, name) do
-      {:ok, functions} ->
-        functions = Enum.filter(functions, predicate)
+  def lookup_functions(context, namespace, name, predicate) do
+    with(
+      {:ok, functions} <- Map.fetch(context.functions, namespace),
+      {:ok, functions} <- Map.fetch(functions, name)
+    ) do
+      functions = Enum.filter(functions, predicate)
 
-        functions ++
-          lookup_functions(
-            context.enclosing,
-            name,
-            &(not Enum.member?(functions, &1) and predicate.(&1))
-          )
-
+      functions ++
+        lookup_functions(
+          context.enclosing,
+          namespace,
+          name,
+          &(not Enum.member?(functions, &1) and predicate.(&1))
+        )
+    else
       :error ->
-        lookup_functions(context.enclosing, name, predicate)
+        lookup_functions(context.enclosing, namespace, name, predicate)
     end
   end
 

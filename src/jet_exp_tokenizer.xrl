@@ -1,6 +1,6 @@
 Definitions.
 
-ID = [a-z][0-9a-zA-Z_']*
+ID = [a-z][0-9a-zA-Z_']*\??
 NAMESPACE = [A-Z][a-zA-Z]*
 
 INT = [0-9]+

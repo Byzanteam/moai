@@ -70,7 +70,18 @@ defmodule JetExp.Core.Interpreter do
   end
 
   defp apply_fun(node, env) do
-    with({:ok, fun} <- Env.lookup(env, node |> Ast.call_id() |> Ast.id_name())) do
+    namespace =
+      case Ast.extract_meta(node, :context) do
+        {:ok, namespace} ->
+          namespace
+
+        :error ->
+          nil
+      end
+
+    with(
+      {:ok, fun} <- Env.lookup_function(env, namespace, node |> Ast.call_id() |> Ast.id_name())
+    ) do
       do_apply_fun(fun, Ast.call_args(node), env)
     end
   end
@@ -230,7 +241,7 @@ defmodule JetExp.Core.Interpreter do
     var_name = Ast.id_name(var)
 
     Enum.reduce_while(source_value, [], fn v, acc ->
-      env = Env.new(%{var_name => v}, env)
+      env = Env.new([bindings: %{var_name => v}], env)
 
       case eval(target, env) do
         {:ok, value} ->

@@ -61,28 +61,40 @@ defmodule JetExp.Core.InterpreterTest do
 
     test "works" do
       assert {:ok, 2.0} ===
-               eval("avg(1, x)", %{
-                 "x" => 3,
-                 "avg" => Env.Function.new(__MODULE__, :avg)
+               eval("Number.avg(1, x)", %{"x" => 3}, %{
+                 "Number" => %{"avg" => Env.Function.new(__MODULE__, :avg)}
                })
 
       assert {:ok, 2} ===
-               eval("avg(1, x)", %{
-                 "x" => 3,
-                 "avg" => Env.Function.new(__MODULE__, :avg, [:trunc])
-               })
+               eval(
+                 "Number.avg(1, x)",
+                 %{
+                   "x" => 3
+                 },
+                 %{"Number" => %{"avg" => Env.Function.new(__MODULE__, :avg, [:trunc])}}
+               )
 
       assert {:ok, nil} ===
-               eval("avg(1, x)", %{
-                 "x" => nil,
-                 "avg" => Env.Function.new(__MODULE__, :avg, [:trunc])
-               })
+               eval(
+                 "Number.avg(1, x)",
+                 %{
+                   "x" => nil
+                 },
+                 %{"Number" => %{"avg" => Env.Function.new(__MODULE__, :avg, [:trunc])}}
+               )
 
       assert {:ok, 0.5} ===
-               eval("avg(1, x)", %{
-                 "x" => nil,
-                 "avg" => Env.Function.new(__MODULE__, :avg, [], require_args: false)
-               })
+               eval(
+                 "Number.avg(1, x)",
+                 %{
+                   "x" => nil
+                 },
+                 %{
+                   "Number" => %{
+                     "avg" => Env.Function.new(__MODULE__, :avg, [], require_args: false)
+                   }
+                 }
+               )
     end
 
     def avg(a, b)
@@ -200,9 +212,13 @@ defmodule JetExp.Core.InterpreterTest do
     end
   end
 
-  defp eval(code, bindings \\ %{}) do
+  defp eval(code, bindings \\ %{}, functions \\ %{}) do
     {:ok, tokens} = JetExp.Tokenizer.tokenize(code)
     {:ok, ast} = JetExp.Parser.parse(tokens)
-    JetExp.Core.Interpreter.eval(ast, JetExp.Core.Interpreter.Env.new(bindings))
+
+    JetExp.Core.Interpreter.eval(
+      ast,
+      JetExp.Core.Interpreter.Env.new(bindings: bindings, functions: functions)
+    )
   end
 end

@@ -1,7 +1,7 @@
 defmodule JetExp.Core.Library.Number do
   @moduledoc false
 
-  use JetExp.Core.Library.Builder
+  use JetExp.Core.Library.Builder, namespace: "Number"
 
   @doc """
   Sums up all numbers in a list. Returns 0 for empty list.
@@ -13,11 +13,21 @@ defmodule JetExp.Core.Library.Number do
 
     iex> n_sum_a([])
     {:ok, 0}
+
+    iex> n_sum_a([1, 2, nil])
+    {:ok, nil}
   """
-  @fun_meta {:n_sum_a, signature: [[:number], :number]}
+  @fun_meta {:sum_a, impl: :n_sum_a, signature: [[:number], :number]}
   @spec n_sum_a([number()]) :: {:ok, number()}
   def n_sum_a(numbers) do
-    {:ok, List.foldr(numbers, 0, &+/2)}
+    {:ok,
+     Enum.reduce_while(numbers, 0, fn
+       nil, _acc ->
+         {:halt, nil}
+
+       x, acc ->
+         {:cont, x + acc}
+     end)}
   end
 
   @doc """
@@ -30,11 +40,21 @@ defmodule JetExp.Core.Library.Number do
 
     iex> n_product_a([])
     {:ok, 1}
+
+    iex> n_product_a([1, 2, nil])
+    {:ok, nil}
   """
-  @fun_meta {:n_product_a, signature: [[:number], :number]}
+  @fun_meta {:product_a, impl: :n_product_a, signature: [[:number], :number]}
   @spec n_product_a([number()]) :: {:ok, number()}
   def n_product_a(numbers) do
-    {:ok, List.foldr(numbers, 1, &*/2)}
+    {:ok,
+     Enum.reduce_while(numbers, 1, fn
+       nil, _acc ->
+         {:halt, nil}
+
+       x, acc ->
+         {:cont, x * acc}
+     end)}
   end
 
   @doc """
@@ -48,7 +68,7 @@ defmodule JetExp.Core.Library.Number do
     iex> n_truncate(1)
     {:ok, 1}
   """
-  @fun_meta {:n_truncate, signature: [:number, :number]}
+  @fun_meta {:truncate, impl: :n_truncate, signature: [:number, :number]}
   @spec n_truncate(number()) :: {:ok, integer()}
   def n_truncate(number) do
     {:ok, trunc(number)}
@@ -68,7 +88,7 @@ defmodule JetExp.Core.Library.Number do
     iex> n_round(3, 1)
     {:ok, 3}
   """
-  @fun_meta {:n_round, signature: [:number, :number]}
+  @fun_meta {:round, impl: :n_round, signature: [:number, :number]}
   @spec n_round(value :: number(), precision :: non_neg_integer()) :: {:ok, number()}
   def n_round(number, _precision) when is_integer(number), do: {:ok, number}
 
@@ -90,7 +110,7 @@ defmodule JetExp.Core.Library.Number do
     iex> n_floor(3, 1)
     {:ok, 3}
   """
-  @fun_meta {:n_floor, signature: [:number, :number]}
+  @fun_meta {:floor, impl: :floor, signature: [:number, :number]}
   @spec n_floor(value :: number(), precision :: non_neg_integer()) :: {:ok, number()}
   def n_floor(number, _precision) when is_integer(number), do: {:ok, number}
 
@@ -112,7 +132,7 @@ defmodule JetExp.Core.Library.Number do
     iex> n_ceil(3, 1)
     {:ok, 3}
   """
-  @fun_meta {:n_ceil, signature: [:number, :number]}
+  @fun_meta {:ceil, impl: :n_ceil, signature: [:number, :number]}
   @spec n_ceil(value :: number(), precision :: non_neg_integer()) :: {:ok, number()}
   def n_ceil(number, _precision) when is_integer(number), do: {:ok, number}
 
@@ -137,7 +157,7 @@ defmodule JetExp.Core.Library.Number do
     iex> n_parse_string("foobar")
     {:ok, nil}
   """
-  @fun_meta {:n_parse_string, signature: [:string, :number]}
+  @fun_meta {:parse_string, impl: :n_parse_string, signature: [:string, :number]}
   @spec n_parse_string(String.t()) :: {:ok, number() | nil}
   def n_parse_string(string) do
     with(
@@ -177,7 +197,7 @@ defmodule JetExp.Core.Library.Number do
     iex> n_to_string(1.1)
     {:ok, "1.1"}
   """
-  @fun_meta {:n_to_string, signature: [:number, :string]}
+  @fun_meta {:to_string, impl: :n_to_string, signature: [:number, :string]}
   @spec n_to_string(number()) :: {:ok, String.t()}
   def n_to_string(number) do
     {:ok, to_string(number)}

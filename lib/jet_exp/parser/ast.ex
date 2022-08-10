@@ -15,8 +15,10 @@ defmodule JetExp.Parser.Ast do
           | call_node()
           | op_node()
 
+  @type namespace() :: String.t()
+
   @type errors() :: Keyword.t()
-  @type node_meta() :: [{:line, non_neg_integer()} | annotation()]
+  @type node_meta() :: [{:line, non_neg_integer()} | {:context, namespace()} | annotation()]
   @type annotation() ::
           {:type, JetExp.Typing.Types.t() | JetExp.Typing.Types.alias()} | {:errors, errors()}
 
@@ -443,10 +445,14 @@ defmodule JetExp.Parser.Ast do
           | list_comp_node_binding()
           | call_node()
           | op_node(),
-          key :: :type | :errors | :line
+          key :: :type | :errors | :line | :context
         ) ::
           {:ok,
-           JetExp.Typing.Types.t() | JetExp.Typing.Types.alias() | errors() | non_neg_integer()}
+           JetExp.Typing.Types.t()
+           | JetExp.Typing.Types.alias()
+           | errors()
+           | non_neg_integer()
+           | namespace()}
           | :error
   def extract_meta(node, key) do
     {_category, node_meta, _args} = node
@@ -461,9 +467,13 @@ defmodule JetExp.Parser.Ast do
           | list_comp_node_binding()
           | call_node()
           | op_node(),
-          key :: :type | :errors | :line
+          key :: :type | :errors | :line | :context
         ) ::
-          JetExp.Typing.Types.t() | JetExp.Typing.Types.alias() | errors() | non_neg_integer()
+          JetExp.Typing.Types.t()
+          | JetExp.Typing.Types.alias()
+          | errors()
+          | non_neg_integer()
+          | namespace()
   def extract_meta!(node, key) do
     {_category, node_meta, _args} = node
     Keyword.fetch!(node_meta, key)

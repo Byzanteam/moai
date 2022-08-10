@@ -15,7 +15,9 @@ defmodule JetExp.IntegrationTest do
           "ds" => SymbolInfo.new(%{type: [date_t]})
         },
         functions: %{
-          "date_diff_days" => [SymbolInfo.new(%{type: {:fun, [date_t, date_t, :number]}})]
+          nil => %{
+            "date_diff_days" => [SymbolInfo.new(%{type: {:fun, [date_t, date_t, :number]}})]
+          }
         }
       ]
       |> JetExp.Parser.Context.new()
@@ -43,14 +45,16 @@ defmodule JetExp.IntegrationTest do
     assert :error === JetExp.Parser.Ast.extract_meta(aast, :errors)
 
     env =
-      Env.new(%{
-        "ds" => [
-          %{"year" => 2020, "month" => 1, "day" => 1},
-          %{"year" => 2020, "month" => 1, "day" => 2},
-          %{"year" => 2020, "month" => 1, "day" => 3}
-        ],
-        "date_diff_days" => Env.Function.new(__MODULE__, :date_diff_days)
-      })
+      Env.new(
+        bindings: %{
+          "ds" => [
+            %{"year" => 2020, "month" => 1, "day" => 1},
+            %{"year" => 2020, "month" => 1, "day" => 2},
+            %{"year" => 2020, "month" => 1, "day" => 3}
+          ]
+        },
+        functions: %{nil => %{"date_diff_days" => Env.Function.new(__MODULE__, :date_diff_days)}}
+      )
 
     assert {:ok, [0, -1, -2]} === JetExp.Core.Interpreter.eval(aast, env)
   end

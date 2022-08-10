@@ -172,9 +172,10 @@ defmodule JetExp.Typing.Annotator do
     call_id = Ast.call_id(node)
     fun_name = Ast.id_name(call_id)
     args = Ast.call_args(node)
+    namespace = get_namespace(node)
 
     context
-    |> Context.lookup_functions(fun_name, &select_fun(&1, args))
+    |> Context.lookup_functions(namespace, fun_name, &select_fun(&1, args))
     |> Enum.map(fn symbol_info ->
       symbol_info
       |> SymbolInfo.extract(:type)
@@ -182,6 +183,16 @@ defmodule JetExp.Typing.Annotator do
     end)
     |> do_infer_call(fun_name, args, context)
     |> attach_error_line(call_id)
+  end
+
+  defp get_namespace(node) do
+    case Ast.extract_meta(node, :context) do
+      {:ok, namespace} ->
+        namespace
+
+      :error ->
+        nil
+    end
   end
 
   defp select_fun(symbol_info, args) do
