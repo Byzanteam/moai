@@ -15,7 +15,8 @@ defmodule JetExp.Core.Library.IntegrationTest do
     Library.Number,
     Library.String,
     Library.Bool,
-    Library.Array
+    Library.Array,
+    Library.DateTime
   ]
 
   setup do
@@ -32,6 +33,7 @@ defmodule JetExp.Core.Library.IntegrationTest do
           "second" => :number
         }
       })
+      |> JetExp.Core.Macro.Sigil.BuiltIn.install()
       |> then(
         &Enum.reduce(@libs, &1, fn lib, context -> apply(lib, :install_symbols, [context]) end)
       )
@@ -114,6 +116,27 @@ defmodule JetExp.Core.Library.IntegrationTest do
       [xs: {[:string], [nil, "foo", "bar"]}],
       :string,
       "hello;foo;bar"
+    )
+
+    assert_type_and_value(
+      """
+      String.concat(
+        Number.to_string(
+          Number.truncate(
+            DateTime.diff_seconds(
+              ~d"2020-01-20T20:38:50",
+              ~d"2020-01-20T20:08:50"
+            ) / 60
+          )
+        ),
+        " 分钟"
+      )
+      """,
+      context,
+      env,
+      [],
+      :string,
+      "30 分钟"
     )
   end
 

@@ -7,13 +7,16 @@ defmodule JetExp.Core.Macro.SigilTest do
     assert %{
              "year" => 2020,
              "month" => 1,
-             "day" => 20
-           } === expand("~d\"2020-01-20\"")
+             "day" => 20,
+             "hour" => 20,
+             "minute" => 38,
+             "second" => 50
+           } === expand("~d\"2020-01-20 20:38:50\"")
   end
 
   test "fails" do
     assert {:ok, [reason: :format]} ===
-             "~d\"2020.01/20\""
+             "~d\"2020-01.20T20:38:50\""
              |> expand()
              |> JetExp.Parser.Ast.extract_meta(:errors)
   end

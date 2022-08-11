@@ -7,26 +7,36 @@ defmodule JetExp.IntegrationTest do
   alias JetExp.Core.Interpreter.Env
 
   test "works" do
-    date_t = %{"year" => :number, "month" => :number, "day" => :number}
-
     context =
       [
         symbols: %{
-          "ds" => SymbolInfo.new(%{type: [date_t]})
+          "ds" => SymbolInfo.new(%{type: ["date_time"]})
         },
         functions: %{
           nil => %{
-            "date_diff_days" => [SymbolInfo.new(%{type: {:fun, [date_t, date_t, :number]}})]
+            "date_diff_days" => [
+              SymbolInfo.new(%{type: {:fun, ["date_time", "date_time", :number]}})
+            ]
           }
         }
       ]
       |> JetExp.Parser.Context.new()
+      |> JetExp.Parser.Context.install_type_aliases(%{
+        "date_time" => %{
+          "year" => :number,
+          "month" => :number,
+          "day" => :number,
+          "hour" => :number,
+          "minute" => :number,
+          "second" => :number
+        }
+      })
       |> JetExp.Core.Macro.Sigil.BuiltIn.install()
 
     code = """
     for d in ds ->
       date_diff_days(
-        ~d\"2020-01-01\",
+        ~d\"2020-01-01T20:12:39\",
         d
       )
     """

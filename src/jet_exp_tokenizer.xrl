@@ -57,7 +57,7 @@ false : {token, {bool, TokenLine, false}}.
 Erlang code.
 
 build_string(TokenChars) ->
-  Binary = list_to_binary(TokenChars),
+  Binary = unicode:characters_to_binary(TokenChars),
   trim_string(Binary).
 
 trim_string(<<"\"", BinTail/binary>>) -> trim_string_tail(BinTail).
