@@ -248,7 +248,7 @@ defmodule Moai.Core.Library.Array do
 
   defp build_fun_symbols(context) do
     type_aliases = context.type_aliases
-    types_and_aliases = Moai.Typing.Types.BuiltIn.all() ++ Map.keys(type_aliases)
+    types_and_aliases = Moai.Typing.Types.Primitive.all() ++ Map.keys(type_aliases)
 
     functions =
       Enum.reduce(@fun_meta, %{}, fn {name, opts}, acc ->

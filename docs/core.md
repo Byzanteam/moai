@@ -99,9 +99,10 @@ strcat_a :: [String] -> String
 
 ```haskell
 -- 求字符串长度
--- strlen("foobar;") := 7
--- strlen("") := 0
-strlen :: String -> Number
+-- length("foobar;") := 7
+-- length("魁拔😀") := 3
+-- length("") := 0
+length :: String -> Number
 ```
 
 ```haskell
@@ -144,6 +145,7 @@ split :: String -> String -> [String]
 ```haskell
 -- 将字符串分割为多个字符
 -- chars("foobar;") := ["f", "o", "o", "b", "a", "r", ";"]
+-- chars("魁拔😀") := ["魁", "拔", "😀"]
 -- chars("") := []
 chars :: String -> [String]
 ```

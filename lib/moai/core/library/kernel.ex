@@ -35,7 +35,7 @@ defmodule Moai.Core.Library.Kernel do
 
   defp build_fun_symbols(context) do
     type_aliases = context.type_aliases
-    types_and_aliases = [nil | Moai.Typing.Types.BuiltIn.all() ++ Map.keys(type_aliases)]
+    types_and_aliases = [nil | Moai.Typing.Types.Primitive.all() ++ Map.keys(type_aliases)]
 
     functions =
       Enum.map(types_and_aliases, fn t ->

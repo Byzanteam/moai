@@ -57,6 +57,9 @@ defmodule Moai.Core.Library.String do
     iex> str_length("foobar")
     {:ok, 6}
 
+    iex> str_length("魁拔😀")
+    {:ok, 3}
+
     iex> str_length("")
     {:ok, 0}
   """
@@ -159,6 +162,9 @@ defmodule Moai.Core.Library.String do
 
     iex> str_chars("foobar")
     {:ok, ["f", "o", "o", "b", "a", "r"]}
+
+    iex> str_chars("魁拔😀")
+    {:ok, ["魁", "拔", "😀"]}
 
     iex> str_chars("")
     {:ok, []}

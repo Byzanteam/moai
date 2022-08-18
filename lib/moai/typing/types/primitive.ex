@@ -1,4 +1,4 @@
-defmodule Moai.Typing.Types.BuiltIn do
+defmodule Moai.Typing.Types.Primitive do
   @moduledoc false
 
   @type t() :: nil | :bool | :number | :string

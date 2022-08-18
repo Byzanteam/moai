@@ -163,7 +163,7 @@ defmodule Moai.Typing.Annotator do
   defp do_infer_conditional(consequent, {:ok, alternative}, context) do
     with(
       {:ok, type} <- extract_type(consequent),
-      :ok <- has_type?(alternative, type, context)
+      :ok <- validate_type(alternative, type, context)
     ) do
       {:ok, type}
     end
@@ -254,7 +254,7 @@ defmodule Moai.Typing.Annotator do
 
     with(
       {:ok, type} <- extract_type(left),
-      :ok <- has_type?(right, type, context)
+      :ok <- validate_type(right, type, context)
     ) do
       {:ok, :bool}
     else
@@ -293,7 +293,7 @@ defmodule Moai.Typing.Annotator do
 
   defguardp is_type_alias(type_or_alias) when is_binary(type_or_alias)
 
-  defp has_type?(node, expected_type, context) do
+  defp validate_type(node, expected_type, context) do
     with(
       {:ok, type} <- extract_type(node),
       true <- type_equal?(expected_type, type, context)
@@ -327,7 +327,7 @@ defmodule Moai.Typing.Annotator do
 
   defp check_homogeneous(nodes, expected_type, final_type, context) do
     Enum.find_value(nodes, {:ok, final_type}, fn node ->
-      with(:ok <- has_type?(node, expected_type, context)) do
+      with(:ok <- validate_type(node, expected_type, context)) do
         false
       end
     end)
