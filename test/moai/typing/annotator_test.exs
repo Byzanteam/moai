@@ -60,7 +60,7 @@ defmodule Moai.Typing.AnnotatorTest do
     test "works" do
       assert {:ok, [:number]} ===
                extract_type(
-                 "for x in xs -> x",
+                 "for x in xs, x > 0, x < 3 -> x",
                  build_symbol_table(%{"xs" => %{type: [:number]}})
                )
     end
@@ -70,6 +70,14 @@ defmodule Moai.Typing.AnnotatorTest do
                extract_type(
                  "for x in xs -> x",
                  build_symbol_table(%{"xs" => %{type: :number}})
+               )
+    end
+
+    test "bad filters" do
+      assert {:error, line: 1, reason: :type_slaps, expected_type: :bool} ===
+               extract_type(
+                 "for x in xs, x > 0, x + 3 -> x",
+                 build_symbol_table(%{"xs" => %{type: [:number]}})
                )
     end
   end

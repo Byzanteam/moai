@@ -210,6 +210,11 @@ defmodule Moai.Core.InterpreterTest do
 
       assert {:ok, nil} === eval("for x in xs -> x + 1", %{"xs" => nil})
     end
+
+    test "works with filters" do
+      assert {:ok, [2, 3]} ===
+               eval("for x in xs, x > 0, x < 3 -> x + 1", %{"xs" => [0, 1, 2, 3, 4]})
+    end
   end
 
   defp eval(code, bindings \\ %{}, functions \\ %{}) do
