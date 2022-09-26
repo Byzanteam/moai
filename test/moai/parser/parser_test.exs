@@ -51,6 +51,7 @@ defmodule Moai.ParserTest do
               {:for, [line: 1],
                [
                  {:in, [line: 1], [{:id, [line: 1], "s"}, {:id, [line: 1], "s_list"}]},
+                 {:filters, [], []},
                  {{:id, [line: 1], "concat"}, [line: 1],
                   [{:id, [line: 1], "s"}, {:id, [line: 1], "suffix"}]}
                ]}} ===
@@ -189,6 +190,7 @@ defmodule Moai.ParserTest do
                  {:for, [line: 1],
                   [
                     {:in, [line: 1], [{:id, [line: 1], "n"}, {:id, [line: 1], "nums"}]},
+                    {:filters, [], []},
                     {:+, [line: 1], [{:id, [line: 1], "n"}, 1]}
                   ]},
                  {:+, [line: 1], [{:id, [line: 1], "num1"}, {:id, [line: 1], "num2"}]}
@@ -212,9 +214,24 @@ defmodule Moai.ParserTest do
                     {:id, [line: 1], "i"},
                     {{:id, [line: 1], "running_sum"}, [line: 1], [{:id, [line: 1], "sales"}]}
                   ]},
+                 {:filters, [], []},
                  {:*, [line: 1], [{:id, [line: 1], "i"}, 0.8]}
                ]}} ===
                parse("for i in running_sum(sales) -> i * 0.8")
+    end
+
+    test "with filters" do
+      assert {:ok,
+              {:for, [line: 1],
+               [
+                 {:in, [line: 1], [{:id, [line: 1], "x"}, {:id, [line: 1], "xs"}]},
+                 {:filters, [],
+                  [
+                    {:>, [line: 1], [{:id, [line: 1], "x"}, 0]},
+                    {:<, [line: 1], [{:id, [line: 1], "x"}, 3]}
+                  ]},
+                 {:*, [line: 1], [{:id, [line: 1], "x"}, 2]}
+               ]}} === parse("for x in xs, x > 0, x < 3 -> x * 2")
     end
   end
 

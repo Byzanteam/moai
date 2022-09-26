@@ -1,6 +1,6 @@
 Nonterminals
   program expr literal group list list_comp call operation
-  comma_sep_list call_args_parens
+  comma_sep_list call_args_parens list_comp_generator
   or_op and_op comp_op rel_op add_op mult_op unary_op dot_op
   .
 
@@ -45,7 +45,9 @@ comma_sep_list -> comma_sep_list ',' expr : ['$3' | '$1'].
 list -> '[' ']' : attach_line({'[]', []}, '$1').
 list -> '[' comma_sep_list ']' : attach_line({'[]', lists:reverse('$2')}, '$1').
 
-list_comp -> 'for' id 'in' expr '->' expr : attach_line(build_list_comp(build_id('$2'), '$4', '$3', '$6'), '$1').
+list_comp -> 'for' list_comp_generator '->' expr : attach_line(build_list_comp('$2', '$4'), '$1').
+list_comp_generator -> id 'in' expr : build_list_comp_generator('$1', '$3', [], '$2').
+list_comp_generator -> id 'in' expr ',' comma_sep_list : build_list_comp_generator('$1', '$3', '$5', '$2').
 
 call -> namespace dot_op call : attach_namespace_to_call('$3', '$1').
 call -> id call_args_parens : attach_line({build_id('$1'), '$2'}, '$1').
@@ -107,7 +109,13 @@ build_unary_op_expr('-', Id) -> {'-', [Id]};
 build_unary_op_expr('not', Bool) when is_boolean(Bool) -> not Bool;
 build_unary_op_expr('not', Id) -> {'not', [Id]}.
 
-build_list_comp(Bind, SourceExpr, In, TargetExpr) -> {for, [attach_line({in, [Bind, SourceExpr]}, In), TargetExpr]}.
+build_list_comp(Generator, TargetExpr) -> {for, Generator ++ [TargetExpr]}.
+
+build_list_comp_generator(Id, SourceExpr, Filters, In) ->
+  [
+   attach_line({in, [build_id(Id), SourceExpr]}, In),
+   {filters, [], lists:reverse(Filters)}
+  ].
 
 attach_line({Form, Args}, {_Category, TokenLine}) ->
   {Form, [{line, TokenLine}], Args};

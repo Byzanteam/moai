@@ -11,6 +11,7 @@ defmodule Moai.Parser.Ast do
           | sigil_node()
           | list_node()
           | list_comp_node_binding()
+          | list_comp_node_filters()
           | list_comp_node()
           | call_node()
           | op_node()
@@ -47,6 +48,7 @@ defmodule Moai.Parser.Ast do
 
   @type list_comp_node() :: {:for, node_meta(), args :: [t(), ...]}
   @type list_comp_node_binding() :: {:in, node_meta(), list_comp_node_binding_args :: [t(), ...]}
+  @type list_comp_node_filters() :: {:filters, node_meta(), list_comp_node_filters_args :: [t()]}
 
   @type call_node() :: {id_node(), node_meta(), args :: [t()]}
 
@@ -145,7 +147,7 @@ defmodule Moai.Parser.Ast do
   end
 
   @spec list_comp?(t()) :: boolean()
-  def list_comp?({:for, _node_meta, [binding, _target_expr]}) do
+  def list_comp?({:for, _node_meta, [binding, _filters, _target_expr]}) do
     list_comp_binding?(binding)
   end
 
@@ -167,8 +169,15 @@ defmodule Moai.Parser.Ast do
 
   def list_comp_binding?(_node), do: false
 
+  @spec list_comp_filters?(t()) :: boolean()
+  def list_comp_filters?({:filters, _node_meta, _filters}) do
+    true
+  end
+
+  def list_comp_filters?(_node), do: false
+
   @spec list_comp_binding(list_comp_node()) :: list_comp_node_binding()
-  def list_comp_binding({:for, _node_meta, [binding, _target_expr]}) do
+  def list_comp_binding({:for, _node_meta, [binding, _filters, _target_expr]}) do
     binding
   end
 
@@ -177,8 +186,18 @@ defmodule Moai.Parser.Ast do
     binding_args
   end
 
+  @spec list_comp_filters(list_comp_node()) :: list_comp_node_filters()
+  def list_comp_filters({:for, _node_meta, [_binding, filters, _target_expr]}) do
+    filters
+  end
+
+  @spec list_comp_filters_args(list_comp_node_filters()) :: [t()]
+  def list_comp_filters_args({:filters, _node_meta, filter_args}) do
+    filter_args
+  end
+
   @spec list_comp_target(list_comp_node()) :: t()
-  def list_comp_target({:for, _node_meta, [_binding, target_expr]}) do
+  def list_comp_target({:for, _node_meta, [_binding, _filters, target_expr]}) do
     target_expr
   end
 
@@ -194,6 +213,14 @@ defmodule Moai.Parser.Ast do
         ) :: list_comp_node_binding()
   def update_list_comp_binding({:in, node_meta, _binding_args}, binding_args) do
     {:in, node_meta, binding_args}
+  end
+
+  @spec update_list_comp_filters(
+          list_comp_node_filters(),
+          list_comp_node_filters_args :: [t()]
+        ) :: list_comp_node_filters()
+  def update_list_comp_filters({:filters, node_meta, _filters_args}, filters_args) do
+    {:filters, node_meta, filters_args}
   end
 
   @spec make_list_comp(list_comp_args :: [t(), ...], node_meta()) :: list_comp_node()
@@ -317,6 +344,7 @@ defmodule Moai.Parser.Ast do
     do_traverse(node, acc, pre, post)
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp do_traverse(node, acc, pre, post) do
     cond do
       atomic?(node) ->
@@ -335,6 +363,10 @@ defmodule Moai.Parser.Ast do
         {source_expr, acc} = pre.(source_expr, acc)
         {source_expr, acc} = do_traverse(source_expr, acc, pre, post)
         post.(update_list_comp_binding(node, [var, source_expr]), acc)
+
+      list_comp_filters?(node) ->
+        {filters_args, acc} = node |> list_comp_filters_args() |> do_traverse_args(acc, pre, post)
+        post.(update_list_comp_filters(node, filters_args), acc)
 
       list_comp?(node) ->
         {args, acc} = node |> list_comp_args() |> do_traverse_args(acc, pre, post)

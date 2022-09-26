@@ -46,6 +46,9 @@ defmodule Moai.Typing.Annotator do
       Ast.list_comp_binding?(node) ->
         perform_list_comp_binding(node, context)
 
+      Ast.list_comp_filters?(node) ->
+        check_list_comp_filters(node, context)
+
       Ast.list_comp?(node) ->
         infer_list_comp(node, context)
 
@@ -125,14 +128,37 @@ defmodule Moai.Typing.Annotator do
     end
   end
 
+  defp check_list_comp_filters(node, context) do
+    node
+    |> Ast.list_comp_filters_args()
+    |> do_check_list_comp_filters(context)
+  end
+
+  defp do_check_list_comp_filters([], _context) do
+    {:ok, :bool}
+  end
+
+  defp do_check_list_comp_filters([filter | _rest] = filters_args, context) do
+    filters_args
+    |> check_homogeneous(:bool, :bool, context)
+    |> attach_error_line(filter)
+  end
+
   defp infer_list_comp(node, context) do
     context = context.enclosing
 
     with(
       {:ok, _type} <- node |> Ast.list_comp_binding() |> extract_type(),
+      :error <- node |> Ast.list_comp_filters() |> Ast.extract_meta(:errors),
       {:ok, type} <- node |> Ast.list_comp_target() |> extract_type()
     ) do
       {:ok, [type], context}
+    else
+      {:ok, filters_errors} ->
+        {:error, filters_errors}
+
+      error ->
+        error
     end
   end
 

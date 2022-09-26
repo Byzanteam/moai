@@ -231,25 +231,38 @@ defmodule Moai.Core.Interpreter do
 
     with(
       {:ok, [_ | _] = source_value} <- eval(source, env),
+      filters = node |> Ast.list_comp_filters() |> Ast.list_comp_filters_args(),
       target = Ast.list_comp_target(node),
-      [_ | _] = target_value <- do_eval_list_comp(source_value, target, var, env)
+      [_ | _] = target_value <- do_eval_list_comp(source_value, filters, target, var, env)
     ) do
       {:ok, Enum.reverse(target_value)}
     end
   end
 
-  defp do_eval_list_comp(source_value, target, var, env) do
+  defp do_eval_list_comp(source_value, filters, target, var, env) do
     var_name = Ast.id_name(var)
 
     Enum.reduce_while(source_value, [], fn v, acc ->
       env = Env.new([bindings: %{var_name => v}], env)
 
-      case eval(target, env) do
-        {:ok, value} ->
-          {:cont, [value | acc]}
+      with(
+        {:ok, true} <- eval_list_comp_filters(filters, env),
+        {:ok, value} <- eval(target, env)
+      ) do
+        {:cont, [value | acc]}
+      else
+        {:ok, false} -> {:cont, acc}
+        :error -> {:halt, :error}
+      end
+    end)
+  end
 
-        :error ->
-          {:halt, :error}
+  defp eval_list_comp_filters(filters, env) do
+    Enum.reduce_while(filters, {:ok, true}, fn filter, acc ->
+      case eval(filter, env) do
+        {:ok, true} -> {:cont, acc}
+        {:ok, false} -> {:halt, {:ok, false}}
+        :error -> {:halt, :error}
       end
     end)
   end
